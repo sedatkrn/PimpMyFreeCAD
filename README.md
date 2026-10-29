@@ -1,9 +1,9 @@
-# PartDesign Add-ins
+# Pimp My PartDesign
 
 Extra features for FreeCAD's **PartDesign** workbench. They are real PartDesign steps in a Body (like Pad or
 Pocket): they recompute with the Body, later steps (fillets, pockets) build on them and the result exports to
 STEP. The tools show up in PartDesign's own *Part Design Modeling Features* toolbar (next to Additive /
-Subtractive Pipe) and in a small *PartDesign Add-ins* workbench.
+Subtractive Pipe) and in a small *Pimp My PartDesign* workbench.
 
 Requires **FreeCAD 1.0 or newer** (developed on 26.3). No extra Python packages.
 
@@ -37,17 +37,17 @@ scale per guide point yet.
 **Addon Manager (custom repository)**
 1. *Tools → Addon manager → ⚙ (settings) → Custom repositories*, add
    `https://github.com/sedatkrn/partdesign_addins` with branch `main`.
-2. Find **PartDesign Add-ins**, install, restart FreeCAD.
+2. Find **Pimp My PartDesign**, install, restart FreeCAD.
 
 **Manual:** clone or unzip this repository into FreeCAD's user `Mod` folder and restart FreeCAD:
-- Windows: `%APPDATA%\FreeCAD\<version>\Mod\partdesign_addins`
-- Linux: `~/.local/share/FreeCAD/<version>/Mod/partdesign_addins`
-- macOS: `~/Library/Application Support/FreeCAD/<version>/Mod/partdesign_addins`
+- Windows: `%APPDATA%\FreeCAD\<version>\Mod\PimpMyPartDesign`
+- Linux: `~/.local/share/FreeCAD/<version>/Mod/PimpMyPartDesign`
+- macOS: `~/Library/Application Support/FreeCAD/<version>/Mod/PimpMyPartDesign`
 
 ## Language
 
 English by default, **Turkish** built in. `auto` (the default) follows FreeCAD's language; set
-`Preferences/Mod/PartDesignAddins/Language` to `en` or `tr` to force one.
+`Preferences/Mod/PimpMyPartDesign/Language` to `en` or `tr` to force one.
 
 ## For developers
 
@@ -66,7 +66,7 @@ documentation are in English.
 ### Türkçe
 
 FreeCAD **PartDesign** için ek özellikler. Body içinde Pad / Pocket gibi gerçek bir adım olarak çalışırlar;
-araçlar PartDesign'ın *Part Design Modeling Features* araç çubuğunda ve küçük bir *PartDesign Add-ins*
+araçlar PartDesign'ın *Part Design Modeling Features* araç çubuğunda ve küçük bir *Pimp My PartDesign*
 workbench'inde görünür.
 
 **Rail Pipe / Rail Groove:** bir ya da iki profil (Body'nin düz yüzü ya da kapalı sketch) seçip düğmeye basın.

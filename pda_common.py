@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# PartDesign Add-ins - shared GUI helpers: Move gizmo (arrows / planes / free cube), screen rays, scene access and
+# Pimp My PartDesign - shared GUI helpers: Move gizmo (arrows / planes / free cube), screen rays, scene access and
 # the cable solver for guide points. Taken from FcSubDModelerWB (subd_modeler.py) so the add-ins do not depend on the
 # SubD Modeler workbench. Copyright (c) 2026 Sedat Kuran - MIT License
 import math
@@ -10,7 +10,7 @@ import FreeCAD as App
 from pivy import coin
 from PySide import QtCore, QtWidgets
 
-PARAM = "User parameter:BaseApp/Preferences/Mod/PartDesignAddins"
+PARAM = "User parameter:BaseApp/Preferences/Mod/PimpMyPartDesign"
 
 
 def _param():

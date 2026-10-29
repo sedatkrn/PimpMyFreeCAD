@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Renamed to **Pimp My PartDesign** (workbench, toolbar, menu, Addon Manager name). Command names, the `pda_`
+  modules and documents made with 0.1.0 are unchanged; the language setting moved to
+  `Preferences/Mod/PimpMyPartDesign`.
 - Rail Pipe: a profile face that belongs to no solid (SubShapeBinder of a face, a lone face) no longer sends
   the pipe out of its back side: like a sketch, it leaves towards the other profile. A binder or sketch that
   lies on the Body's surface is treated like the Body's own face (outward, end carried into the body, so the

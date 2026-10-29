@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
-"""PartDesign Add-ins user interface language: English (default) or Turkish.
+"""Pimp My PartDesign user interface language: English (default) or Turkish.
 
 UI strings are written in English in the code and wrapped with T(); when Turkish is selected T() looks them
 up in the TR table below (format placeholders such as %s / %.3f must stay the same).
 
 The language is stored in FreeCAD's parameters:
-    User parameter:BaseApp/Preferences/Mod/PartDesignAddins  ->  Language = "auto" | "en" | "tr"
+    User parameter:BaseApp/Preferences/Mod/PimpMyPartDesign  ->  Language = "auto" | "en" | "tr"
 "auto" (the default) follows FreeCAD's own language: Turkish if FreeCAD runs in Turkish, English otherwise.
 """
 import FreeCAD as App
 
-PARAM = "User parameter:BaseApp/Preferences/Mod/PartDesignAddins"
+PARAM = "User parameter:BaseApp/Preferences/Mod/PimpMyPartDesign"
 LANGUAGES = ("en", "tr")
 
 _lang = None

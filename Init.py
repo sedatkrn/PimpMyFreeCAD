@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# PartDesign Add-ins - application (non-GUI) start-up. Only makes sure the modules in this folder can be imported;
+# Pimp My PartDesign - application (non-GUI) start-up. Only makes sure the modules in this folder can be imported;
 # saved Rail Pipe objects refer to the module "pda_railpipe", so documents open (and recompute) without the GUI.
 import os
 import sys

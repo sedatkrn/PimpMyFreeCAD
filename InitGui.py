@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-# PartDesign Add-ins - FreeCAD GUI start-up. Copyright (c) 2026 Sedat Kuran - MIT License
+# Pimp My PartDesign - FreeCAD GUI start-up. Copyright (c) 2026 Sedat Kuran - MIT License
 #
 # Araclar PartDesign'in kendi arac cubugunda ("Part Design Modeling Features", Additive / Subtractive Pipe'in
-# yaninda) gorunur; ayrica kucuk bir "PartDesign Add-ins" workbench'i de ayni araclari toplar.
+# yaninda) gorunur; ayrica kucuk bir "Pimp My PartDesign" workbench'i de ayni araclari toplar.
 import FreeCADGui as Gui
 
 
-class PartDesignAddinsWorkbench(Gui.Workbench):
-    MenuText = "PartDesign Add-ins"
+class PimpMyPartDesignWorkbench(Gui.Workbench):
+    MenuText = "Pimp My PartDesign"
     ToolTip = "Extra PartDesign features: Rail Pipe / Rail Groove along an editable guide curve"
 
     def __init__(self):
@@ -16,8 +16,8 @@ class PartDesignAddinsWorkbench(Gui.Workbench):
 
     def Initialize(self):
         import pda_commands
-        self.appendToolbar("PartDesign Add-ins", pda_commands.COMMANDS)
-        self.appendMenu("PartDesign Add-ins", pda_commands.COMMANDS)
+        self.appendToolbar("Pimp My PartDesign", pda_commands.COMMANDS)
+        self.appendMenu("Pimp My PartDesign", pda_commands.COMMANDS)
 
     def Activated(self):
         pass
@@ -55,6 +55,6 @@ class _RestoreObserver:
 
 import FreeCAD as App
 App.addDocumentObserver(_RestoreObserver())
-Gui.addWorkbench(PartDesignAddinsWorkbench())
+Gui.addWorkbench(PimpMyPartDesignWorkbench())
 if hasattr(Gui, "addWorkbenchManipulator"):
     Gui.addWorkbenchManipulator(_PartDesignTools())
