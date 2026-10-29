@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Round Rail Pipes (circle at both ends) are now built as a loft through circle sections placed along the guide
+  with our own twist-free frame: r = 20 +- 0.025 mm, surface normals within 0.4 degrees, C2, about 50 control
+  rows along the pipe instead of 210. The C1 sweep was accurate in position but its many small patches looked
+  blotchy on screen. Thickness works; other profiles keep the C1 sweep.
+- New pipes get a finer display tessellation (Deviation 0.05, AngularDeflection 5 degrees); FreeCAD's 28.5 degree
+  default drew streaks on curved pipes. For older pipes set these two in the View properties.
 - Rail Pipe works with **Thickness** (and other offsets) again: the pipe surface is built C1 (CorrectedFrenet with
   C1 approximation, max degree 3, 1000 segments, 1e-4 tolerance). The exact sweep without C1 left parametric C0
   joints at the guide points and OCCT refused to offset it ("BRep_API: command not done"); the default C1

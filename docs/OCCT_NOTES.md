@@ -34,6 +34,14 @@ any sweep, boolean or interactive PartDesign tool in this repository.
   help, neither does knot removal. Use `setForceApproxC1(True)` **with** `setMaxDegree(3)`,
   `setMaxSegments(1000)`, `setTolerance(1e-4, 1e-4, 1e-2)`: C1, r = 20 +- 0.07 mm (defaults: off by up to 4 mm),
   ~0.1 s. Interpolating a C2 guide through samples wiggled and was worse.
+- **Round pipes: loft instead of sweep.** Place circle sections along the guide with an own rotation-minimizing
+  frame (product of minimal rotations between tangents, ~12 sub-steps per station, at least 48 stations, seam
+  carried along) and `Part.makeLoft(sections, True, False, False, 5)`: r = 20 +- 0.025 mm, normals within 0.4
+  degrees, C2, 15 x 51 poles, offsets work. The C1 sweep (15 x 210 poles) was right in position but rendered
+  blotchy. A loft between ellipses of different size failed in `makeThickness`, so only circles use it.
+- **Judge quality by normals and on screen**, not only by distance to the spine: compare `normalAt` with the
+  direction from the nearest spine point. Also lower the display tessellation (AngularDeflection 28.5 deg default
+  draws streaks on curved pipes; 5 deg and Deviation 0.05 look smooth).
 - **`setForceApproxC1(True)`** avoids C0 faces, but together with two profiles it can fling the control poles.
   `Shape.BoundBox` is computed from the poles, so check sanity with `Shape.optimalBoundingBox()` instead.
 - A swept solid can come out **inside-out**: test `isInside(spine midpoint)` and `reverse()` it.

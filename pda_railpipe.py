@@ -463,6 +463,25 @@ def build_tools(obj):
     tries += [(("aux", a, True), True) for a in auxs]
     tries += [(("binormal", binormal, None), c1) for c1 in (True, False)] if binormal is not None else []
     given = False
+    global LAST_MODE
+    # 0. iki ucu daire olan boru: kendi burulmasiz cercevemizle daire kesitler + loft (asagida _loft_tool). En
+    #    duzgunu: motor-test borulari r=20 +- 0.025 mm, normal sapmasi < 0.4 derece, C2, boyunca ~50 kontrol noktasi
+    #    (supurme 210: ekranda yamali parliyordu), Thickness olur, ~0.06 s. Boyu degisen elipsler arasindaki loft
+    #    Thickness'te 'command not done' verdi: obur tek kenarli profiller supurmeyle kalir.
+    circle = lambda w: len(w.Edges) == 1 and "Circle" in w.Edges[0].Curve.TypeId
+    if not PREVIEW and circle(wa) and circle(wb):
+        try:
+            tool = _loft_tool(spine, wa, wb, size)
+        except Exception:
+            tool = None
+        if tool is not None and not tool.isNull() and tool.Solids:
+            tool = tool.Solids[0]
+            if not tool.isInside(mid, 1e-7, True):
+                tool.reverse()
+            if tool.isValid() and box.isInside(_tight_box(tool)):
+                LAST_MODE = ("loft", None, None)
+                yield tool
+                given = True
     for (mode, arg, cureq), c1 in tries:
         ps = Part.BRepOffsetAPI.MakePipeShell(spine)
         if mode == "aux":
@@ -493,7 +512,6 @@ def build_tools(obj):
             # cevir (onizlemede gerekmez: yalniz boolean icin onemli, nokta testi surukleme adiminin 3/4'u)
             tool.reverse()
         if tool.isValid() and (PREVIEW or box.isInside(_tight_box(tool))):   # onizleme: kutu denetimi yok (hiz)
-            global LAST_MODE
             LAST_MODE = (mode, cureq, c1)                  # tani icin: son kullanilan supurme yontemi
             yield tool
             given = True
@@ -501,6 +519,70 @@ def build_tools(obj):
         err = "Rail Pipe: the sweep gave an invalid solid"
     if not given:
         yield err
+
+
+def _stations(e, K, sub=12):
+    """Kenar boyunca esit aralikli K + 1 istasyon: (nokta, teget, baslangictan buraya burulmasiz tasima donmesi).
+    Tasima K * sub kucuk adimda en kisa donmelerin carpimi (Rail bridge'in cercevesi gibi)."""
+    L = e.Length
+    R, prev, out = App.Rotation(), e.tangentAt(e.getParameterByLength(0.0)), []
+    for k in range(K * sub + 1):
+        u = e.getParameterByLength(L * k / float(K * sub))
+        t = e.tangentAt(u)
+        R = App.Rotation(prev, t).multiply(R)
+        prev = t
+        if k % sub == 0:
+            out.append((e.valueAt(u), t, App.Rotation(R)))
+    return out
+
+
+def _loft_tool(spine, wa, wb, size):
+    """Tek kenarli kapali iki uc teli (wa, wb: dikisleri hizali) arasinda loft: kilavuz boyunca istasyonlarda,
+    burulmasiz cerceveyle tasinan kesitler; sekil A'dan B'ye kademeli gecer. Daireler: gercek daire kesitler;
+    obur egriler: 64 noktada karisim, periyodik spline. Istasyon sayisi kilavuz boyuna gore (en az 48)."""
+    e = spine.Edges[0]
+    K = int(min(max(48, math.ceil(e.Length / (0.25 * size))), 240))
+    ea, eb = wa.Edges[0], wb.Edges[0]
+    ca, cb = Part.Face(wa).CenterOfMass, Part.Face(wb).CenterOfMass
+    F = _stations(e, K)
+    circ = "Circle" in ea.Curve.TypeId and "Circle" in eb.Curve.TypeId
+    if circ:
+        ra, rb = ea.Curve.Radius, eb.Curve.Radius
+        seam = ea.Vertexes[0].Point - ca
+    else:
+        M = 64
+        sample = lambda ed, j: ed.valueAt(ed.FirstParameter + (ed.LastParameter - ed.FirstParameter) * j / M)
+        if ea.Orientation == "Reversed":
+            sample_a = lambda j: sample(ea, M - j)
+        else:
+            sample_a = lambda j: sample(ea, j)
+        if eb.Orientation == "Reversed":
+            sample_b = lambda j: sample(eb, M - j)
+        else:
+            sample_b = lambda j: sample(eb, j)
+        inv = F[-1][2].inverted()                          # B'nin sekli, oraya tasinan cercevede
+        pa = [sample_a(j) - ca for j in range(M)]
+        pb = [inv.multVec(sample_b(j) - cb) for j in range(M)]
+    secs = [wa]
+    for i in range(1, K):
+        c, t, R = F[i]
+        s = i / float(K)
+        if circ:
+            rad = ra + (rb - ra) * s
+            sd = R.multVec(seam)
+            sd = sd - t * sd.dot(t)
+            circle = Part.Circle(c, t, rad)
+            u0 = circle.parameter(c + sd.normalize() * rad)
+            ed = Part.Edge(circle, u0, u0 + 2 * math.pi)
+            if ea.Orientation == "Reversed":
+                ed.reverse()
+            secs.append(Part.Wire([ed]))
+        else:
+            bs = Part.BSplineCurve()
+            bs.interpolate([c + R.multVec(a * (1 - s) + b * s) for a, b in zip(pa, pb)], PeriodicFlag=True)
+            secs.append(Part.Wire([bs.toShape()]))
+    secs.append(wb)
+    return Part.makeLoft(secs, True, False, False, 5)
 
 
 class RailPipe:
@@ -636,8 +718,15 @@ def make(body, start, end=None, subtractive=False):
     obj.GuidePoints = initial_points(pa, pb, subtractive)
     if App.GuiUp:
         ViewProviderRailPipe(obj.ViewObject, None)
-        obj.ViewObject.Deviation = 0.1                     # varsayilan 0.5: kavisli boru ekranda dalgali gorunuyordu
+        _fine_display(obj)
     return obj
+
+
+def _fine_display(obj):
+    """Ekran ucgenlemesi ince: varsayilan (Deviation 0.5, AngularDeflection 28.5 derece) kavisli boruyu yamali ve
+    cizgili parlatiyordu; 0.05 ve 5 derecede motor-test borulari puruzsuz gorunur."""
+    obj.ViewObject.Deviation = 0.05
+    obj.ViewObject.AngularDeflection = 5.0
 
 
 def make_part(doc, start, end=None):
@@ -658,7 +747,7 @@ def make_part(doc, start, end=None):
     obj.GuidePoints = initial_points(pa, pb, False)
     if App.GuiUp:
         ViewProviderRailPipe(obj.ViewObject, None)
-        obj.ViewObject.Deviation = 0.1
+        _fine_display(obj)
     return obj
 
 
