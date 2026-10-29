@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- PartDesign-style block -->
+  <path d="M8 38 L30 28 L56 38 L34 50 Z" fill="#f0b23a"/>
+  <path d="M8 38 L34 50 L34 60 L8 48 Z" fill="#c98a1c"/>
+  <path d="M34 50 L56 38 L56 48 L34 60 Z" fill="#9c6a12"/>
+  <!-- pipe along a guide -->
+  <path d="M18 38 C18 18 30 8 46 12" fill="none" stroke="#3b6fb6" stroke-width="10"/>
+  <path d="M18 38 C18 18 30 8 46 12" fill="none" stroke="#f5c518" stroke-width="1.6" stroke-dasharray="3 2"/>
+  <circle cx="24" cy="21" r="2.4" fill="#f5c518"/>
+  <circle cx="35" cy="12.5" r="2.4" fill="#f5c518"/>
+  <!-- plus badge -->
+  <circle cx="52" cy="14" r="9" fill="#16a34a"/>
+  <rect x="46.5" y="12.5" width="11" height="3" rx="1" fill="#ffffff"/>
+  <rect x="50.5" y="8.5" width="3" height="11" rx="1" fill="#ffffff"/>
+</svg>
