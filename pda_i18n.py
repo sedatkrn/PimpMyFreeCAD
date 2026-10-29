@@ -61,6 +61,16 @@ TR = {
         'Kılavuz',
     'Move neighbors':
         'Komşular da gelsin',
+    'Options':
+        'Seçenekler',
+    'New Rail Pipes in their own Body':
+        "Yeni raylı borular kendi Body'sinde",
+    "PartDesign: each new Rail Pipe gets its own Body, so pipes don't recompute and fuse together (faster). Applies to the next pipe; in the Part workbench pipes are always separate solids":
+        "PartDesign: her yeni raylı boru kendi Body'sinde olur, borular birlikte yeniden hesaplanmaz ve birleştirilmez (daha hızlı). Sonraki boruya uygulanır; Part workbench'te borular her zaman ayrı katıdır",
+    'Rail Pipe in its own Body':
+        "Raylı boru kendi Body'sinde",
+    "PartDesign: each new Rail Pipe gets its own Body (its profiles are bound with SubShapeBinders), so pipes don't recompute and fuse together. Fuse the Bodies later if you need one solid":
+        "PartDesign: her yeni raylı boru kendi Body'sinde olur (profilleri SubShapeBinder ile bağlanır), borular birlikte yeniden hesaplanmaz ve birleştirilmez. Tek katı gerekirse Body'leri sonra birleştirin",
     'PartDesign: add a pipe along a guide curve from a flat face or closed sketch to a second one or a free end. Edit GuidePoints, Tension and EndScale in the property view':
         "PartDesign: düz bir yüzden ya da kapalı sketch'ten ikincisine ya da serbest uca, kılavuz eğri boyunca boru ekler. GuidePoints, Tension ve EndScale özellik panelinden düzenlenir",
     'PartDesign: cut a groove along a guide curve from a flat face or closed sketch (and to a second one). Edit GuidePoints, Tension and EndScale in the property view':

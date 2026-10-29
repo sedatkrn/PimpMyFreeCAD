@@ -28,6 +28,13 @@ Sweeps a profile along a guide curve and adds it to the Body (**Rail Pipe**) or 
   - The task panel also has the selected point's X / Y / Z, *Tension*, *End scale* and *Reversed*.
   - While dragging a fast preview is shown; the smooth result is computed when you release. **OK** keeps the
     changes as one undo step, **Cancel** reverts them.
+- **Several pipes, faster:** with *Rail Pipe in its own Body* switched on (checkable button next to Rail Groove,
+  also under *Options* in the task panel) each new pipe gets its own Body; its profiles are bound with
+  SubShapeBinders, so the pipes don't recompute and fuse together on every change. Fuse the Bodies later if you
+  need one solid.
+- **Part workbench:** the Rail Pipe button also sits next to Part's Sweep. There the pipe is a standalone solid
+  outside any Body (profiles can be faces or sketches of any object, read in global coordinates); add it to or
+  cut it from a shape with Part Fuse / Cut. Editing on screen works the same way.
 
 Limits of this first version: the profile is the start face's / sketch's outer outline (holes are ignored), no
 scale per guide point yet.

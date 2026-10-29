@@ -26,34 +26,59 @@ def _is_sketch(o):
     return o is not None and (o.TypeId == "Sketcher::SketchObject" or o.isDerivedFrom("Part::Part2DObject"))
 
 
-def profile(link):
+def is_part(obj):
+    """Part workbench'teki Rail Pipe (Body disinda, kendi basina kati) mi; degilse PartDesign adimi."""
+    return not obj.TypeId.startswith("PartDesign::")
+
+
+def _shape(o, sub, glob):
+    """Nesnenin sekli / alt elemani. glob: dunya koordinatinda (Part surumu: profil baska bir Body'de olabilir,
+    Body'nin yerlesimi uygulanir); degilse nesnenin kendi koordinatinda (PartDesign: ayni Body'nin icinde)."""
+    if glob:
+        return Part.getShape(o, sub or "", needSubElement=bool(sub))
+    return o.Shape.getElement(sub) if sub else o.Shape
+
+
+def _closed_wire(sh):
+    ws = [w for w in sh.Wires if w.isClosed()]
+    return max(ws, key=lambda w: w.BoundBox.DiagonalLength) if ws else None
+
+
+def profile(link, glob=False):
     """PropertyLinkSub'tan profil: (dis tel, merkez, normal, katinin yuzu mu) ya da None / hata metni. Katinin duz
     yuzu: normali disari bakar, boru oradan cikar. Sketch (alt eleman yok ya da kenar): en buyuk kapali teli, normali
     sketch duzleminin Z'si. Katisi olmayan yuz (SubShapeBinder, tek basina yuz / kabuk; alt eleman yoksa tek yuzu):
-    normalinin yonu rastgele (Binder'da boru ters taraftan cikiyordu), sketch gibi isareti egriye gore secilir."""
+    normalinin yonu rastgele (Binder'da boru ters taraftan cikiyordu), sketch gibi isareti egriye gore secilir.
+    Yuzu olmayan kapali tel (sketch'in Binder'i): sketch gibi. glob: dunya koordinatinda (Part surumu)."""
     if not link or link[0] is None:
         return None
     o, subs = link[0], list(link[1] or [])
     if _is_sketch(o):
-        ws = [w for w in o.Shape.Wires if w.isClosed()]
-        if not ws:
+        w = _closed_wire(_shape(o, None, glob))
+        if w is None:
             return "Rail Pipe: the sketch has no closed profile"
-        w = max(ws, key=lambda w: w.BoundBox.DiagonalLength)
-        return w, Part.Face(w).CenterOfMass, o.Placement.Rotation.multVec(V(0, 0, 1)), False
+        pl = o.getGlobalPlacement() if glob else o.Placement
+        return w, Part.Face(w).CenterOfMass, pl.Rotation.multVec(V(0, 0, 1)), False
     f = None
-    if subs:
-        try:
-            f = o.Shape.getElement(subs[0])
-        except Exception:
-            f = None
-    elif len(o.Shape.Faces) == 1:                          # agacta secilen tek yuzlu nesne (or. Binder)
-        f = o.Shape.Faces[0]
+    try:
+        sh = _shape(o, None, glob)
+        if subs:
+            f = _shape(o, subs[0], glob)
+        elif len(sh.Faces) == 1:                           # agacta secilen tek yuzlu nesne (or. Binder)
+            f = sh.Faces[0]
+        elif not sh.Faces:                                 # yuzu olmayan kapali tel (sketch'in Binder'i)
+            w = _closed_wire(sh)
+            if w is not None:
+                pf = Part.Face(w)
+                return w, pf.CenterOfMass, pf.normalAt(0, 0), False
+    except Exception:
+        f = None
     if f is None or f.ShapeType != "Face":
         return "Rail Pipe: the start face is missing"
     if not (f.isPlanar() if hasattr(f, "isPlanar") else f.Surface.TypeId == "Part::GeomPlane"):
         return "Rail Pipe: the start face must be flat"
     c, n = face_frame(f)
-    return f.OuterWire, c, n, bool(o.Shape.Solids)
+    return f.OuterWire, c, n, bool(sh.Solids)
 
 
 def face_frame(f):
@@ -327,16 +352,25 @@ def _directions(pa, pb, pts, sub, reversed_):
     return ta, tb
 
 
+def _base(obj):
+    """Onceki govdenin sekli (PartDesign BaseFeature); Part surumunde ve Body'nin ilk adiminda None."""
+    b = getattr(obj, "BaseFeature", None)
+    if b is None or b.Shape.isNull():
+        return None
+    return b.Shape
+
+
 def guide_nodes(obj):
     """Ekranda duzenleme icin: (dugumler [A merkezi, kilavuz noktalari, (B merkezi)], ta, tb) ya da hata metni."""
-    pa = profile(obj.StartFace)
+    g = is_part(obj)
+    pa = profile(obj.StartFace, g)
     if pa is None or isinstance(pa, str):
         return pa or "Rail Pipe: the start face is missing"
-    pb = profile(obj.EndFace)
+    pb = profile(obj.EndFace, g)
     if isinstance(pb, str):
         return pb
     pts = list(obj.GuidePoints)
-    base = obj.BaseFeature.Shape if obj.BaseFeature is not None else None
+    base = _base(obj)
     pa, pb = _on_body(pa, base), _on_body(pb, base)
     ta, tb = _directions(pa, pb, pts, obj.TypeId == "PartDesign::FeatureSubtractivePython", obj.Reversed)
     return [pa[1]] + pts + ([pb[1]] if pb is not None else []), ta, tb
@@ -351,14 +385,15 @@ def build_tool(obj):
 
 def build_tools(obj):
     """Supurulen katilar, denenecek sirayla (bkz. asagidaki yontem sirasi); hicbiri olmazsa tek bir hata metni."""
-    pa = profile(obj.StartFace)
+    g = is_part(obj)
+    pa = profile(obj.StartFace, g)
     if pa is None:
         yield "Rail Pipe: the start face is missing"
         return
     if isinstance(pa, str):
         yield pa
         return
-    pb = profile(obj.EndFace)
+    pb = profile(obj.EndFace, g)
     if isinstance(pb, str):
         yield pb
         return
@@ -366,7 +401,7 @@ def build_tools(obj):
     if pb is None and not pts:
         yield "Rail Pipe: a free end needs at least one guide point"
         return
-    base = obj.BaseFeature.Shape if obj.BaseFeature is not None else None
+    base = _base(obj)
     pa, pb = _on_body(pa, base), _on_body(pb, base)
     ta, tb = _directions(pa, pb, pts, obj.TypeId == "PartDesign::FeatureSubtractivePython", obj.Reversed)
     ca = pa[1]
@@ -465,22 +500,22 @@ class RailPipe:
     """Rail Pipe (FeatureAdditivePython) / Rail Groove (FeatureSubtractivePython) nesnesinin Proxy'si."""
 
     def __init__(self, obj):
-        obj.addProperty("App::PropertyLinkSub", "StartFace", "Rail", "Flat face the pipe starts from (A)")
-        obj.addProperty("App::PropertyLinkSub", "EndFace", "Rail", "Face the pipe ends on (B); empty: free end")
+        link = "App::PropertyLinkSubGlobal" if is_part(obj) else "App::PropertyLinkSub"   # Part: baska Body'lere
+        obj.addProperty(link, "StartFace", "Rail", "Flat face the pipe starts from (A)")
+        obj.addProperty(link, "EndFace", "Rail", "Face the pipe ends on (B); empty: free end")
         obj.addProperty("App::PropertyVectorList", PROPS, "Rail",
                         "Guide curve points between A and B (with a free end: the last one is the end)")
         obj.addProperty("App::PropertyFloat", "Tension", "Rail", "0 smooth curve .. 1 straight between points")
         obj.addProperty("App::PropertyFloat", "EndScale", "Rail", "Size of the free end relative to A").EndScale = 1.0
         obj.addProperty("App::PropertyBool", "Reversed", "Rail", "Leave A to the other side")
-        if "Refine" not in obj.PropertiesList:             # PartDesign'in kendi Refine ozelligi (yoksa ekle)
-            obj.addProperty("App::PropertyBool", "Refine", "Base", "Merge coplanar faces of the result")
-        obj.Refine = True
+        if not is_part(obj):                               # Part surumunde boolean yok: Refine gereksiz
+            if "Refine" not in obj.PropertiesList:         # PartDesign'in kendi Refine ozelligi (yoksa ekle)
+                obj.addProperty("App::PropertyBool", "Refine", "Base", "Merge coplanar faces of the result")
+            obj.Refine = True
         obj.Proxy = self
 
     def execute(self, obj):
-        base = obj.BaseFeature.Shape if obj.BaseFeature is not None else None
-        if base is not None and base.isNull():
-            base = None
+        base = _base(obj)                                  # Part surumu: yok, sekil yalniz borudur
         sub = obj.TypeId == "PartDesign::FeatureSubtractivePython"
         first = None
         # boolean sonucu da denetlenir: gecersizse, bir kati bolunduyse ya da hacmi tutmuyorsa (ekleme: govde + boru
@@ -489,7 +524,7 @@ class RailPipe:
         for tool in build_tools(obj):
             if isinstance(tool, str):
                 raise RuntimeError(T(tool))
-            res = _combine(base, tool, sub, obj.Refine)
+            res = _combine(base, tool, sub, getattr(obj, "Refine", False))
             if res is None:
                 continue
             if first is None:
@@ -499,7 +534,9 @@ class RailPipe:
                 break
         if first is None:
             raise RuntimeError(T("Rail Pipe: the sweep gave an invalid solid"))
-        obj.AddSubShape, obj.Shape = first
+        if hasattr(obj, "AddSubShape"):
+            obj.AddSubShape = first[0]
+        obj.Shape = first[1]
 
     def dumps(self):
         return None
@@ -593,6 +630,58 @@ def make(body, start, end=None, subtractive=False):
     if App.GuiUp:
         ViewProviderRailPipe(obj.ViewObject, None)
         obj.ViewObject.Deviation = 0.1                     # varsayilan 0.5: kavisli boru ekranda dalgali gorunuyordu
+    return obj
+
+
+def make_part(doc, start, end=None):
+    """Part workbench: Body disinda, kendi basina Rail Pipe katisi (boolean yok; govdeye Part Fuse / Cut ile
+    eklenir). start / end: (nesne, "FaceN") ya da sketch icin (nesne, None); profiller herhangi bir nesnenin (baska
+    Body'lerin de) yuzleri olabilir, dunya koordinatinda okunur. Nesne ya da hata metni."""
+    link = lambda p: (p[0], [p[1]] if p[1] else [])
+    pa = profile(link(start), True)
+    pb = profile(link(end), True) if end is not None else None
+    for p in (pa, pb):
+        if isinstance(p, str):
+            return p
+    obj = doc.addObject("Part::FeaturePython", "RailPipe")
+    RailPipe(obj)
+    obj.StartFace = link(start)
+    if end is not None:
+        obj.EndFace = link(end)
+    obj.GuidePoints = initial_points(pa, pb, False)
+    if App.GuiUp:
+        ViewProviderRailPipe(obj.ViewObject, None)
+        obj.ViewObject.Deviation = 0.1
+    return obj
+
+
+def make_own_body(doc, start, end=None):
+    """PartDesign, kendi Body'sinde: yeni bir Body acilir, profiller ona SubShapeBinder olarak baglanir ve boru
+    o Body'nin ilk katisi olur. Ayni Body'de birikmis borularin her degisiklikte yeniden hesaplanmasi ve boolean'i
+    olmaz. Nesne ya da hata metni (o zaman hicbir sey olusturulmaz)."""
+    for p in (start, end):
+        if p is None:
+            continue
+        pr = profile((p[0], [p[1]] if p[1] else []), True)
+        if isinstance(pr, str):
+            return pr
+    body = doc.addObject("PartDesign::Body", "RailPipeBody")
+    profs = []
+    for p in (start, end):
+        if p is None:
+            profs.append(None)
+            continue
+        b = body.newObject("PartDesign::SubShapeBinder", "RailPipeProfile")
+        b.Support = [(p[0], (p[1],) if p[1] else ("",))]
+        b.recompute()
+        if App.GuiUp:
+            b.ViewObject.Visibility = False
+        profs.append((b, None))
+    obj = make(body, profs[0], profs[1])
+    if isinstance(obj, str):
+        for o in list(body.Group):
+            doc.removeObject(o.Name)
+        doc.removeObject(body.Name)
     return obj
 
 

@@ -47,13 +47,23 @@ class _RailPipe:
                                        "PartDesign Body.\n"))
             return
         obj = prof[0][0]
-        body = obj.getParentGeoFeatureGroup() if hasattr(obj, "getParentGeoFeatureGroup") else None
-        if body is None or body.TypeId != "PartDesign::Body":
-            App.Console.PrintWarning(T("Rail Pipe: the faces must belong to a PartDesign Body.\n"))
-            return
         doc = obj.Document
+        end = prof[1] if len(prof) > 1 else None
+        # Part workbench'te: Body disinda kendi basina kati. PartDesign'da "own Body" secenegi acikken: yeni Body.
+        part = not self.sub and _workbench() == "PartWorkbench"
+        own = not self.sub and not part and own_body()
+        if not (part or own):
+            body = obj.getParentGeoFeatureGroup() if hasattr(obj, "getParentGeoFeatureGroup") else None
+            if body is None or body.TypeId != "PartDesign::Body":
+                App.Console.PrintWarning(T("Rail Pipe: the faces must belong to a PartDesign Body.\n"))
+                return
         doc.openTransaction(T("Rail Groove") if self.sub else T("Rail Pipe"))
-        new = pda_railpipe.make(body, prof[0], prof[1] if len(prof) > 1 else None, self.sub)
+        if part:
+            new = pda_railpipe.make_part(doc, prof[0], end)
+        elif own:
+            new = pda_railpipe.make_own_body(doc, prof[0], end)
+        else:
+            new = pda_railpipe.make(body, prof[0], end, self.sub)
         if isinstance(new, str):
             doc.abortTransaction()
             App.Console.PrintWarning(T(new) + "\n")
@@ -66,14 +76,52 @@ class _RailPipe:
         if "Invalid" in new.State:
             App.Console.PrintWarning(T("Rail Pipe: the first sweep failed; adjust GuidePoints in the property "
                                        "view.\n"))
-        elif new.BaseFeature is not None:
+        elif getattr(new, "BaseFeature", None) is not None:
             new.BaseFeature.ViewObject.Visibility = False
             new.ViewObject.Visibility = True
         Gui.Selection.clearSelection()
         Gui.Selection.addSelection(new)
 
 
+def _workbench():
+    try:
+        return Gui.activeWorkbench().name()
+    except Exception:
+        return ""
+
+
+def own_body():
+    """Secenek: PartDesign'da her yeni Rail Pipe kendi Body'sinde (Preferences/Mod/PimpMyPartDesign/RailPipeOwnBody)."""
+    import pda_common
+    return pda_common._param().GetBool("RailPipeOwnBody", False)
+
+
+def set_own_body(on):
+    import pda_common
+    pda_common._param().SetBool("RailPipeOwnBody", bool(on))
+
+
+class _OwnBody:
+    """Secenek dugmesi (isaretlenebilir): yeni Rail Pipe'lar PartDesign'da kendi Body'lerinde olussun. Ayni Body'deki
+    borular her degisiklikte birlikte yeniden hesaplanmaz, boolean'a girmez (hizli)."""
+
+    def GetResources(self):
+        return {"Pixmap": os.path.join(ICONS, "pda_railpipe.svg"), "MenuText": T("Rail Pipe in its own Body"),
+                "ToolTip": T("PartDesign: each new Rail Pipe gets its own Body (its profiles are bound with "
+                             "SubShapeBinders), so pipes don't recompute and fuse together. Fuse the Bodies later "
+                             "if you need one solid"),
+                "Checkable": own_body()}
+
+    def IsActive(self):
+        return True
+
+    def Activated(self, checked=None):
+        set_own_body(bool(checked) if checked is not None else not own_body())
+
+
 COMMANDS = ["PDA_RailPipe", "PDA_RailGroove"]
+OPTIONS = ["PDA_RailPipeOwnBody"]
 
 Gui.addCommand("PDA_RailPipe", _RailPipe(False))
 Gui.addCommand("PDA_RailGroove", _RailPipe(True))
+Gui.addCommand("PDA_RailPipeOwnBody", _OwnBody())

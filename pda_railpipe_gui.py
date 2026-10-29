@@ -176,7 +176,7 @@ class Editor(object):
     def _preview_on(self):
         vo = self.obj.ViewObject
         self.saved = dict(t=vo.Transparency, mode=vo.DisplayMode, color=getattr(vo, "PreviewColor", None))
-        base = self.obj.BaseFeature
+        base = getattr(self.obj, "BaseFeature", None)     # Part surumunde yok: nesne yari saydam
         self.saved["base"] = base.ViewObject.Visibility if base is not None else None
         self.native = hasattr(vo, "showPreview")
         if not self.native:
@@ -207,8 +207,9 @@ class Editor(object):
             if sv["color"] is not None:
                 vo.PreviewColor = sv["color"]
             vo.DisplayMode = sv["mode"]
-            if self.obj.BaseFeature is not None and sv["base"] is not None:
-                self.obj.BaseFeature.ViewObject.Visibility = sv["base"]
+            base = getattr(self.obj, "BaseFeature", None)
+            if base is not None and sv["base"] is not None:
+                base.ViewObject.Visibility = sv["base"]
         vo.Transparency = sv["t"]
 
     def _coarse(self, on):
@@ -530,6 +531,17 @@ class Panel(object):
         self.rev.setChecked(bool(ed.obj.Reversed))
         self.rev.toggled.connect(lambda on: self.ed.set_prop("Reversed", bool(on)))
         grid.addWidget(self.rev, 4, 0, 1, 2)
+        lay.addWidget(g)
+        import pda_commands                                # secenek: sonraki Rail Pipe'lar (bu boruyu degistirmez)
+        g = QtWidgets.QGroupBox(T("Options"))
+        grid = QtWidgets.QGridLayout(g)
+        own = QtWidgets.QCheckBox(T("New Rail Pipes in their own Body"))
+        own.setToolTip(T("PartDesign: each new Rail Pipe gets its own Body, so pipes don't recompute and fuse "
+                         "together (faster). Applies to the next pipe; in the Part workbench pipes are always "
+                         "separate solids"))
+        own.setChecked(pda_commands.own_body())
+        own.toggled.connect(pda_commands.set_own_body)
+        grid.addWidget(own, 0, 0, 1, 2)
         lay.addWidget(g)
         lay.addStretch()
         self.sync()
