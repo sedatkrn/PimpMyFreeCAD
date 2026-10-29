@@ -172,7 +172,17 @@ class Editor(object):
         col.rgb = (0.1, 0.45, 0.25) if not sub else (0.5, 0.1, 0.1)
         self.t_lines = coin.SoIndexedLineSet()             # halkalar: sekil okunur
         self.tube = coin.SoSeparator()
-        for n in (hints, mat, self.t_coord, self.t_mesh, lm, col, self.t_lines):
+        # noktalar her adimda degisir: onbellege alinan cizim / sinir kutusu yuzunden agin bazi bolgeleri
+        # kayboluyor, gorunum oynayinca geri geliyordu; kirpma ve onbellek kapali
+        for f in ("renderCaching", "boundingBoxCaching", "renderCulling", "pickCulling"):
+            setattr(self.tube, f, coin.SoSeparator.OFF)
+        nodes = [hints, mat]
+        if hasattr(coin, "SoDepthBuffer"):                 # saydam ag derinlik yazmasin: kendi ustune binen
+            db = coin.SoDepthBuffer()                      # yerlerde ondeki parca arkadakini silmesin (cisimler
+            db.write = False                               # yine ortuyor: derinlik testi acik)
+            nodes.append(db)
+        nodes += [self.t_coord, self.t_mesh, lm, col, self.t_lines]
+        for n in nodes:
             self.tube.addChild(n)
         self.parent.addChild(self.tube)
 
