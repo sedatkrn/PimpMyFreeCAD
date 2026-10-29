@@ -442,23 +442,26 @@ def build_tools(obj):
     binormal = _plane_normal([ca] + N[1:] + [end], ta)
     err = "Rail Pipe: the sweep gave no solid"
     # sirayla denenir, gecerli ve egrinin cevresinde kalan ilk sonuc alinir:
-    # 1. CorrectedFrenet, once C1 yaklasimsiz: kesit egriye tam dik (motor-test borularinda r=20 boru 20.000 mm).
-    #    Kesit egri boyunca birkac derece salinabiliyor (dikis cizgisi dalgali; yuvarlak profilde gorunmez). Duz
-    #    cizgide tanimsiz ('No geometry'): o zaman sonrakiler.
-    # 2. yardimci omurga (kendi burulmasiz cercevemizin yan yonunden gecen egri, egrisel eslesme + C1): salinim
-    #    yok ama kivrimda kesit egriye dik kalmiyor, boru yer yer yassilasiyor (r=20 boruda 16.8-20.4 mm, yuzey
-    #    kirik kirik gorunuyordu); bu yuzden ikinci sirada.
-    # 3. duzlemsel egride sabit binormal (duz cizgide de calisir, ama iki profilli kivrimda bazen gecersiz).
-    # C1'siz sonuc C0 kenar birakip sonraki boolean'i bozabilir: dogruluk boolean sonucunun hacmiyle denetlenir
-    # (RailPipe.execute), tutmazsa siradaki (C1 yaklasimli) denenir. BOP kontrolu sert kivrimda 25 s
-    # surebiliyordu, kullanilmaz.
+    # 1. CorrectedFrenet + C1 yaklasim (setMaxDegree 3, 1000 parca, 1e-4 tolerans): C1 yuzey. Thickness / fillet /
+    #    ofset icin sart: C1'siz yuzey kilavuz noktalarinda parametrik C0 kaliyor (CorrectedFrenet cercevesi
+    #    egrilige bagli, C1 kilavuzun noktalarinda sicriyor) ve OCCT ofseti 'BRep_API: command not done' ile
+    #    reddediyordu. Varsayilan C1 yaklasim boruyu 4 mm'ye kadar bozuyordu; bu ayarla motor-test borulari
+    #    r=20 +- 0.07 mm, ~0.1 s (yuzey derecesi yine 13/14 cikiyor, ayar dogrulugu artiriyor).
+    # 2. CorrectedFrenet C1'siz: kesit tam dik ve tam yuvarlak ama yuzey C0 (ofset / Thickness olmaz); yedek.
+    #    Surukleme sirasinda (PREVIEW) bu once denenir: ~0.08 s. Duz cizgide CorrectedFrenet tanimsiz ('No
+    #    geometry'): o zaman sonrakiler.
+    # 3. yardimci omurga (kendi burulmasiz cercevemizin yan yonunden gecen egri, egrisel eslesme + C1): kivrimda
+    #    kesit egriye dik kalmiyor, boru yer yer yassilasiyor (r=20 boruda 16.8-20.4 mm).
+    # 4. duzlemsel egride sabit binormal (duz cizgide de calisir, ama iki profilli kivrimda bazen gecersiz).
+    # Dogruluk boolean sonucunun hacmiyle denetlenir (RailPipe.execute), tutmazsa siradaki denenir. BOP kontrolu
+    # sert kivrimda 25 s surebiliyordu, kullanilmaz.
     size = max(wa.BoundBox.DiagonalLength, 1.0)
     auxs = [] if PREVIEW else [a for a in (_aux_spine(bs, ta, first - ca, size * k) for k in (1.0, 2.0)) if a]
     # Yardimci omurga OCCT'de kirilgan: egrisel eslesme kapaliyken bazen dakikalarca takiliyor; yalniz egrisel
     # eslesme + C1 denenir (profil boyu ve iki kati uzakta). Surukleme sirasinda (PREVIEW) hic denenmez.
-    tries = [(("frenet", None, None), c1) for c1 in (False, True)]
+    tries = [(("frenet", None, None), c1) for c1 in ((False, True) if PREVIEW else (True, False))]
     tries += [(("aux", a, True), True) for a in auxs]
-    tries += [(("binormal", binormal, None), c1) for c1 in (False, True)] if binormal is not None else []
+    tries += [(("binormal", binormal, None), c1) for c1 in (True, False)] if binormal is not None else []
     given = False
     for (mode, arg, cureq), c1 in tries:
         ps = Part.BRepOffsetAPI.MakePipeShell(spine)
@@ -469,6 +472,10 @@ def build_tools(obj):
         else:
             ps.setFrenetMode(False)
         ps.setForceApproxC1(c1)
+        if c1:                                             # sik parcali C1 yaklasim: dogru ve ofsetlenebilir
+            ps.setMaxDegree(3)
+            ps.setMaxSegments(1000)
+            ps.setTolerance(1e-4, 1e-4, 1e-2)
         ps.add(wa, False, False)
         if not single:
             ps.add(wb, False, False)

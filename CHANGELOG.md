@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Rail Pipe works with **Thickness** (and other offsets) again: the pipe surface is built C1 (CorrectedFrenet with
+  C1 approximation, max degree 3, 1000 segments, 1e-4 tolerance). The exact sweep without C1 left parametric C0
+  joints at the guide points and OCCT refused to offset it ("BRep_API: command not done"); the default C1
+  approximation was off by up to 4 mm. motor-test pipes: r = 20 +- 0.07 mm, 2 mm Thickness OK on all four.
 - Rail Pipe in its own Body (option: checkable button in PartDesign's toolbar and the add-in's menu, also under
   *Options* in the task panel): each new pipe gets a new Body with its profiles bound by SubShapeBinders, so
   pipes no longer recompute and fuse together (motor-test pipe 1: 0.15 s).

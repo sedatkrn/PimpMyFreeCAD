@@ -28,6 +28,12 @@ any sweep, boolean or interactive PartDesign tool in this repository.
     round pipe must give its radius everywhere.
   - `setBiNormalMode(plane normal)` works for planar and straight guides, but is sometimes invalid with two
     profiles in a bend. Use it as a fallback.
+- **Offsets need C1.** CorrectedFrenet without C1 approximation is exactly round but leaves parametric C0 joints at
+  the guide's knots (the frame depends on curvature, which jumps at the C1 knots of the guide); `makeThickness` /
+  PartDesign Thickness then fail with "BRep_API: command not done". Splitting the face at those knots does not
+  help, neither does knot removal. Use `setForceApproxC1(True)` **with** `setMaxDegree(3)`,
+  `setMaxSegments(1000)`, `setTolerance(1e-4, 1e-4, 1e-2)`: C1, r = 20 +- 0.07 mm (defaults: off by up to 4 mm),
+  ~0.1 s. Interpolating a C2 guide through samples wiggled and was worse.
 - **`setForceApproxC1(True)`** avoids C0 faces, but together with two profiles it can fling the control poles.
   `Shape.BoundBox` is computed from the poles, so check sanity with `Shape.optimalBoundingBox()` instead.
 - A swept solid can come out **inside-out**: test `isInside(spine midpoint)` and `reverse()` it.
