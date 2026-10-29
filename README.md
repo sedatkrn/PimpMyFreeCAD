@@ -28,6 +28,8 @@ Sweeps a profile along a guide curve and adds it to the Body (**Rail Pipe**) or 
     1 = rubber band.
   - The task panel also has the selected point's X / Y / Z, *Tension*, *End scale* and *Reversed*.
   - **OK** computes the pipe and keeps the changes as one undo step, **Cancel** reverts them.
+  - *Shell* (under *Options*) makes the pipe hollow with open ends and the given *Wall thickness*. Use this
+    instead of PartDesign Thickness, which is unreliable on swept surfaces.
 - **Several pipes, faster:** with *Rail Pipe in its own Body* switched on (checkable button next to Rail Groove,
   also under *Options* in the task panel) each new pipe gets its own Body; its profiles are bound with
   SubShapeBinders, so the pipes don't recompute and fuse together on every change. Fuse the Bodies later if you

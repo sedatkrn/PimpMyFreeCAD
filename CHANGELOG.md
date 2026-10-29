@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- **Shell** option for Rail Pipe (task panel *Options*: *Shell* + *Wall thickness*; properties Shell /
+  WallThickness): a hollow pipe with open ends. The end profiles are inset by the wall thickness, swept the same
+  way along the same guide and cut from the outer pipe, so it doesn't depend on FreeCAD's Thickness (OCCT offset),
+  which was unreliable on swept surfaces. motor-test: 2 mm wall, 0.5-1.6 s per pipe. Older pipes get the
+  properties when the document is opened.
 - Editing a Rail Pipe no longer computes the solid at all: the pipe is drawn as a light translucent mesh of rings
   along the guide (about 18 ms per drag step instead of sweeping and fusing on every move), the profiles are read
   once per edit, and the real pipe is computed once on **OK** (motor-test: 0.5 s). Cancel computes nothing.

@@ -63,6 +63,14 @@ TR = {
         'Komşular da gelsin',
     'Options':
         'Seçenekler',
+    'Shell (hollow pipe, open ends)':
+        'Kabuk (içi boş, uçları açık boru)',
+    'Makes the pipe hollow with the wall thickness below; computed when you press OK':
+        "Boruyu aşağıdaki et kalınlığıyla içi boş yapar; OK'e basınca hesaplanır",
+    'Wall thickness':
+        'Et kalınlığı',
+    'Rail Pipe: the wall is too thick for the profile':
+        'Raylı boru: et kalınlığı profil için fazla',
     'New Rail Pipes in their own Body':
         "Yeni raylı borular kendi Body'sinde",
     "PartDesign: each new Rail Pipe gets its own Body, so pipes don't recompute and fuse together (faster). Applies to the next pipe; in the Part workbench pipes are always separate solids":

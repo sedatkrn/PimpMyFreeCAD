@@ -486,7 +486,7 @@ def build_tools(obj):
     box.enlarge(2.0 * max(wa.BoundBox.DiagonalLength, wb.BoundBox.DiagonalLength))
     mid = bs.value((bs.FirstParameter + bs.LastParameter) / 2)
     binormal = _plane_normal([ca] + N[1:] + [end], ta)
-    err = "Rail Pipe: the sweep gave no solid"
+    wb_dir = tb if fb is not None else R.multVec(ta)      # B telinin donus yonu (ic tel de ayni yone)
     # sirayla denenir, gecerli ve egrinin cevresinde kalan ilk sonuc alinir:
     # 1. CorrectedFrenet + C1 yaklasim (setMaxDegree 3, 1000 parca, 1e-4 tolerans): C1 yuzey. Thickness / fillet /
     #    ofset icin sart: C1'siz yuzey kilavuz noktalarinda parametrik C0 kaliyor (CorrectedFrenet cercevesi
@@ -508,63 +508,90 @@ def build_tools(obj):
     tries = [(("frenet", None, None), c1) for c1 in ((False, True) if PREVIEW else (True, False))]
     tries += [(("aux", a, True), True) for a in auxs]
     tries += [(("binormal", binormal, None), c1) for c1 in (True, False)] if binormal is not None else []
-    given = False
     global LAST_MODE
     # 0. iki ucu daire olan boru: kendi burulmasiz cercevemizle daire kesitler + loft (asagida _loft_tool). En
     #    duzgunu: motor-test borulari r=20 +- 0.025 mm, normal sapmasi < 0.4 derece, C2, boyunca ~50 kontrol noktasi
-    #    (supurme 210: ekranda yamali parliyordu), Thickness olur, ~0.06 s. Boyu degisen elipsler arasindaki loft
-    #    Thickness'te 'command not done' verdi: obur tek kenarli profiller supurmeyle kalir.
+    #    (supurme 210: ekranda yamali parliyordu), ~0.06 s. Boyu degisen elipsler arasindaki loft ofsette
+    #    'command not done' verdi: obur tek kenarli profiller supurmeyle kalir.
     circle = lambda w: len(w.Edges) == 1 and "Circle" in w.Edges[0].Curve.TypeId
-    if not PREVIEW and circle(wa) and circle(wb):
+    specs = [("loft", None, None, None)] if not PREVIEW and circle(wa) and circle(wb) else []
+    specs += [(m, a, cq, c1) for (m, a, cq), c1 in tries]
+    err = ["Rail Pipe: the sweep gave no solid"]
+
+    def make(spec, wa_, wb_):
+        """Bir yontemle (spec) wa_ -> wb_ katisi: gecerli, disari donuk ve egrinin cevresinde; olmazsa None."""
+        mode, arg, cureq, c1 = spec
         try:
-            tool = _loft_tool(spine, wa, wb, size)
-        except Exception:
-            tool = None
-        if tool is not None and not tool.isNull() and tool.Solids:
-            tool = tool.Solids[0]
-            if not tool.isInside(mid, 1e-7, True):
-                tool.reverse()
-            if tool.isValid() and box.isInside(_tight_box(tool)):
-                LAST_MODE = ("loft", None, None)
-                yield tool
-                given = True
-    for (mode, arg, cureq), c1 in tries:
-        ps = Part.BRepOffsetAPI.MakePipeShell(spine)
-        if mode == "aux":
-            ps.setAuxiliarySpine(arg, cureq, 0)
-        elif mode == "binormal":
-            ps.setBiNormalMode(arg)
-        else:
-            ps.setFrenetMode(False)
-        ps.setForceApproxC1(c1)
-        if c1:                                             # sik parcali C1 yaklasim: dogru ve ofsetlenebilir
-            ps.setMaxDegree(3)
-            ps.setMaxSegments(1000)
-            ps.setTolerance(1e-4, 1e-4, 1e-2)
-        ps.add(wa, False, False)
-        if not single:
-            ps.add(wb, False, False)
-        try:
-            ps.build()
-            ps.makeSolid()
-            tool = ps.shape()
+            if mode == "loft":
+                tool = _loft_tool(spine, wa_, wb_, size)
+            else:
+                ps = Part.BRepOffsetAPI.MakePipeShell(spine)
+                if mode == "aux":
+                    ps.setAuxiliarySpine(arg, cureq, 0)
+                elif mode == "binormal":
+                    ps.setBiNormalMode(arg)
+                else:
+                    ps.setFrenetMode(False)
+                ps.setForceApproxC1(c1)
+                if c1:                                     # sik parcali C1 yaklasim: dogru ve ofsetlenebilir
+                    ps.setMaxDegree(3)
+                    ps.setMaxSegments(1000)
+                    ps.setTolerance(1e-4, 1e-4, 1e-2)
+                ps.add(wa_, False, False)
+                if not single:
+                    ps.add(wb_, False, False)
+                ps.build()
+                ps.makeSolid()
+                tool = ps.shape()
         except Exception as e:
-            err = T("Rail Pipe: the sweep failed (%s)") % e
-            continue
-        if tool.isNull() or not tool.Solids:
-            continue
+            err[0] = T("Rail Pipe: the sweep failed (%s)") % e
+            return None
+        if tool is None or tool.isNull() or not tool.Solids:
+            return None
         tool = tool.Solids[0]
         if not PREVIEW and not tool.isInside(mid, 1e-7, True):   # ters yuzlu (ici disina donuk) cikabiliyor:
-            # cevir (onizlemede gerekmez: yalniz boolean icin onemli, nokta testi surukleme adiminin 3/4'u)
-            tool.reverse()
+            tool.reverse()                                 # cevir (onizlemede gerekmez: yalniz boolean icin)
         if tool.isValid() and (PREVIEW or box.isInside(_tight_box(tool))):   # onizleme: kutu denetimi yok (hiz)
-            LAST_MODE = (mode, cureq, c1)                  # tani icin: son kullanilan supurme yontemi
-            yield tool
-            given = True
+            return tool
+        err[0] = "Rail Pipe: the sweep gave an invalid solid"
+        return None
+
+    # Shell: ici bos boru. Uc telleri Wall kadar iceri ofsetlenir (daire -> kucuk daire), ayni yontemle supurulur ve
+    # dis borudan cikarilir: uclar acik halka. FreeCAD'in Thickness'i (OCCT ofseti) supurulen yuzeylerde
+    # guvenilir degildi; ic yuzey burada ofset degil ayni kilavuzla ikinci bir supurme.
+    wall = float(getattr(obj, "WallThickness", 0.0)) if getattr(obj, "Shell", False) else 0.0
+    inner = None
+    if wall > 0 and obj.TypeId != "PartDesign::FeatureSubtractivePython":
+        try:
+            ia = _oriented(_inset(wa, wall), ta)
+            ib = _oriented(_inset(wb, wall * (obj.EndScale if fb is None else 1.0)), wb_dir)
+            f0 = ia.OrderedEdges[0].Vertexes[0].Point
+            ib = _start_near(ib, R.multVec(f0 - ca) * (obj.EndScale if fb is None else 1.0) + end)
+            inner = (ia, ib)
+        except Exception:
+            yield "Rail Pipe: the wall is too thick for the profile"
+            return
+    given = False
+    for spec in specs:
+        tool = make(spec, wa, wb)
+        if tool is None:
             continue
-        err = "Rail Pipe: the sweep gave an invalid solid"
+        if inner is not None:                              # ayni yontemle ic boru, dis borudan cikar
+            hole = make(spec, inner[0], inner[1])
+            if hole is None:
+                continue
+            try:
+                tool = tool.cut(hole)
+            except Exception:
+                continue
+            if tool.isNull() or not tool.Solids or not tool.isValid():
+                continue
+            tool = tool.Solids[0] if len(tool.Solids) == 1 else tool
+        LAST_MODE = spec[:3] if spec[0] != "loft" else ("loft", None, None)
+        yield tool
+        given = True
     if not given:
-        yield err
+        yield err[0]
 
 
 def _stations(e, K, sub=12):
@@ -631,6 +658,25 @@ def _loft_tool(spine, wa, wb, size):
     return Part.makeLoft(secs, True, False, False, 5)
 
 
+def _inset(w, d):
+    """Kapali teli d kadar iceri ofsetle. makeOffset2D'nin isareti kenar yonune bagli (ters yonlu daire -2 ile
+    buyuyordu): alani kuculten taraf alinir."""
+    area = Part.Face(w).Area
+    for k in (-d, d):
+        off = w.makeOffset2D(k)
+        if off.isClosed() and Part.Face(off).Area < area:
+            return off
+    raise ValueError("inset")
+
+
+def _shell_props(obj):
+    """Shell / WallThickness (sonradan eklendi: eski nesnelerde belge acilinca eklenir)."""
+    if "Shell" not in obj.PropertiesList:
+        obj.addProperty("App::PropertyBool", "Shell", "Rail", "Hollow pipe with open ends (Rail Pipe only)")
+        obj.addProperty("App::PropertyLength", "WallThickness", "Rail", "Wall thickness of the hollow pipe")
+        obj.WallThickness = 2.0
+
+
 class RailPipe:
     """Rail Pipe (FeatureAdditivePython) / Rail Groove (FeatureSubtractivePython) nesnesinin Proxy'si."""
 
@@ -643,6 +689,7 @@ class RailPipe:
         obj.addProperty("App::PropertyFloat", "Tension", "Rail", "0 smooth curve .. 1 straight between points")
         obj.addProperty("App::PropertyFloat", "EndScale", "Rail", "Size of the free end relative to A").EndScale = 1.0
         obj.addProperty("App::PropertyBool", "Reversed", "Rail", "Leave A to the other side")
+        _shell_props(obj)
         if not is_part(obj):                               # Part surumunde boolean yok: Refine gereksiz
             if "Refine" not in obj.PropertiesList:         # PartDesign'in kendi Refine ozelligi (yoksa ekle)
                 obj.addProperty("App::PropertyBool", "Refine", "Base", "Merge coplanar faces of the result")
@@ -672,6 +719,9 @@ class RailPipe:
         if hasattr(obj, "AddSubShape"):
             obj.AddSubShape = first[0]
         obj.Shape = first[1]
+
+    def onDocumentRestored(self, obj):
+        _shell_props(obj)
 
     def dumps(self):
         return None
