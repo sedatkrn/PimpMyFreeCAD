@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Editing a Rail Pipe no longer computes the solid at all: the pipe is drawn as a light translucent mesh of rings
+  along the guide (about 18 ms per drag step instead of sweeping and fusing on every move), the profiles are read
+  once per edit, and the real pipe is computed once on **OK** (motor-test: 0.5 s). Cancel computes nothing.
 - Round Rail Pipes (circle at both ends) are now built as a loft through circle sections placed along the guide
   with our own twist-free frame: r = 20 +- 0.025 mm, surface normals within 0.4 degrees, C2, about 50 control
   rows along the pipe instead of 210. The C1 sweep was accurate in position but its many small patches looked

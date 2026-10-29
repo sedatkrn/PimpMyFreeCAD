@@ -17,8 +17,9 @@ Sweeps a profile along a guide curve and adds it to the Body (**Rail Pipe**) or 
 - **Guide curve:** leaves the start profile perpendicular and (with two profiles) enters the end profile
   perpendicular, passing through *GuidePoints*. *Tension* (0 smooth .. 1 straight between points) tightens it;
   uneven point spacing does not make it bulge. *Reversed* flips the start direction.
-- **Edit on screen:** double-click the feature. The Body is shown as when editing a Pad / Pocket: the previous
-  solid plus a green (pipe) or red (groove) translucent preview, with the guide curve in yellow.
+- **Edit on screen:** double-click the feature. The previous solid stays visible and the pipe is drawn as a light
+  green (pipe) or red (groove) translucent mesh around the yellow guide curve. No solid is computed while you
+  edit, so dragging stays fluid (~20 ms per step); the real, smooth pipe is computed once when you press **OK**.
   - Click a yellow point and move it with the **Move gizmo** (arrows: along X / Y / Z, squares: in a plane, cube:
     in the screen plane) or drag the point itself. The white end points belong to the profiles and stay put.
   - Click the curve to pick a span: *Add point* puts a point exactly where you clicked. *Delete point* removes the
@@ -26,8 +27,7 @@ Sweeps a profile along a guide curve and adds it to the Body (**Rail Pipe**) or 
   - *Move neighbors*: the guide follows the dragged point like a cable; *Elasticity* 0 = chain (lengths kept) ..
     1 = rubber band.
   - The task panel also has the selected point's X / Y / Z, *Tension*, *End scale* and *Reversed*.
-  - While dragging a fast preview is shown; the smooth result is computed when you release. **OK** keeps the
-    changes as one undo step, **Cancel** reverts them.
+  - **OK** computes the pipe and keeps the changes as one undo step, **Cancel** reverts them.
 - **Several pipes, faster:** with *Rail Pipe in its own Body* switched on (checkable button next to Rail Groove,
   also under *Options* in the task panel) each new pipe gets its own Body; its profiles are bound with
   SubShapeBinders, so the pipes don't recompute and fuse together on every change. Fuse the Bodies later if you

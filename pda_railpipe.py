@@ -360,8 +360,9 @@ def _base(obj):
     return b.Shape
 
 
-def guide_nodes(obj):
-    """Ekranda duzenleme icin: (dugumler [A merkezi, kilavuz noktalari, (B merkezi)], ta, tb) ya da hata metni."""
+def edit_profiles(obj):
+    """Ekranda duzenleme icin profiller bir kez okunur (her fare adiminda profil + govde uzerinde mi denetimi
+    pahaliydi): (pa, pb) ya da hata metni."""
     g = is_part(obj)
     pa = profile(obj.StartFace, g)
     if pa is None or isinstance(pa, str):
@@ -369,11 +370,56 @@ def guide_nodes(obj):
     pb = profile(obj.EndFace, g)
     if isinstance(pb, str):
         return pb
-    pts = list(obj.GuidePoints)
     base = _base(obj)
-    pa, pb = _on_body(pa, base), _on_body(pb, base)
+    return _on_body(pa, base), _on_body(pb, base)
+
+
+def guide_nodes(obj, prof=None):
+    """Ekranda duzenleme icin: (dugumler [A merkezi, kilavuz noktalari, (B merkezi)], ta, tb) ya da hata metni.
+    prof: edit_profiles() sonucu (verilmezse profiller okunur)."""
+    if prof is None:
+        prof = edit_profiles(obj)
+    if isinstance(prof, str):
+        return prof
+    pa, pb = prof
+    pts = list(obj.GuidePoints)
     ta, tb = _directions(pa, pb, pts, obj.TypeId == "PartDesign::FeatureSubtractivePython", obj.Reversed)
     return [pa[1]] + pts + ([pb[1]] if pb is not None else []), ta, tb
+
+
+def preview_rings(obj, prof, K=48, M=24):
+    """Duzenleme onizlemesi icin hafif boru: kilavuz boyunca K + 1 halka, her biri M nokta (nesnenin koordinatinda,
+    liste listesi). OCCT supurmesi / boolean yok, birkac milisaniye: sinirlari gormek icin. Halkalar burulmasiz
+    cerceveyle tasinir, sekil A'dan B'ye (serbest uc: EndScale'e) gecer. Olmazsa None."""
+    res = guide_nodes(obj, prof)
+    if isinstance(res, str):
+        return None
+    N, ta, tb = res
+    pa, pb = prof
+    try:
+        bs = guide_spline(N, ta, tb, obj.Tension)
+        F = _stations(bs.toShape(), K, 4)
+        wa = _oriented(pa[0], ta)
+        a = [p - pa[1] for p in wa.discretize(M + 1)[:M]]
+        b = None
+        if pb is not None:
+            wb = _oriented(pb[0], tb)
+            inv = F[-1][2].inverted()
+            q = [inv.multVec(p - pb[1]) for p in wb.discretize(M + 1)[:M]]
+            k = min(range(M), key=lambda j: (q[j] - a[0]).Length)   # dikis: A'nin ilk noktasina en yakin
+            b = q[k:] + q[:k]
+    except Exception:
+        return None
+    rings = []
+    for i, (c, t, R) in enumerate(F):
+        s = i / float(K)
+        if b is not None:
+            ring = [c + R.multVec(p * (1 - s) + q * s) for p, q in zip(a, b)]
+        else:
+            k = 1.0 + (obj.EndScale - 1.0) * s
+            ring = [c + R.multVec(p * k) for p in a]
+        rings.append(ring)
+    return rings
 
 
 def build_tool(obj):

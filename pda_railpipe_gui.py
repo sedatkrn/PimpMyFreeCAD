@@ -4,7 +4,8 @@
 #
 # RailPipe'a cift tiklayinca (setEdit): kilavuz egri sari cizgi, noktalari tutamak (A / B uclari sabit, beyaz).
 # Secili noktada modelleyicinin Tasi gizmosu (oklar: eksen, kareler: duzlem, kup: ekran duzlemi); noktanin kendisi
-# de surukulenebilir (ekran duzleminde). Egri hemen, boru kisa araliklarla yeniden hesaplanir. Gorev paneli: secili noktanin X / Y / Z'si, nokta ekle / sil, Move
+# de surukulenebilir (ekran duzleminde). Duzenlerken boru hafif bir ag olarak cizilir (OCCT yok); gercek boru
+# OK'e basinca hesaplanir. Gorev paneli: secili noktanin X / Y / Z'si, nokta ekle / sil, Move
 # neighbors (modelleyicideki kablo davranisi, pda_common.rail_cable) ve Elasticity, Tension, EndScale, Reversed.
 # OK degisiklikleri tek geri alma adimi olarak birakir, Cancel geri alir.
 import numpy as np
@@ -89,6 +90,8 @@ class Editor(object):
             self.root.addChild(n)
         self.parent = pda_common._scene_parent(self.view)
         self.parent.addChild(self.root)
+        self.prof = rp.edit_profiles(obj)                  # profiller bir kez okunur (her adimda pahaliydi)
+        self._tube_nodes()
         self.gizmo = pda_common.MoveGizmo(self.view)     # FcSubDModelerWB'deki Tasi gizmosu: oklar, duzlemler, kup
         self.parent.addChild(self.gizmo.root)
         self.zoom = QtCore.QTimer()                        # yakinlastirinca gizmo ekranda ayni boyda kalsin
@@ -97,9 +100,6 @@ class Editor(object):
         self._preview_on()
         self.cb_btn = self.view.addEventCallbackPivy(coin.SoMouseButtonEvent.getClassTypeId(), self.on_btn)
         self.cb_mov = self.view.addEventCallbackPivy(coin.SoLocation2Event.getClassTypeId(), self.on_move)
-        self.timer = QtCore.QTimer()                       # surukleme sirasinda boru en fazla bu aralikla hesaplanir
-        self.timer.setSingleShot(True)
-        self.timer.timeout.connect(self._recompute)
         self.panel = Panel(self)
         Gui.Control.closeDialog()
         Gui.Control.showDialog(self.panel)
@@ -113,7 +113,9 @@ class Editor(object):
         return self.inv.Rotation.multVec(V(d))
 
     def nodes(self):
-        res = rp.guide_nodes(self.obj)
+        if isinstance(self.prof, str):
+            return None
+        res = rp.guide_nodes(self.obj, self.prof)
         return None if isinstance(res, str) else res
 
     def movable(self, j, N):
@@ -150,80 +152,66 @@ class Editor(object):
         on = self.sel is not None and self.sel < len(W) and self.movable(self.sel, N)
         if self.drag is None or self.drag["key"][0] == "point":
             self.gizmo.place(W[self.sel] if on else None)
+        self._tube()
 
-    def _recompute(self):
-        """Surukleme sirasinda: yalniz boru hizli yontemle supurulur ve onizlemeye verilir (Body boolean'i,
-        sadelestirme ve gizli seklin cizimi atlanir; birakinca end_drag tam hesaplar). PartDesign onizlemesi
-        yoksa nesnenin kendisi hizli yontemle hesaplanir."""
-        rp.PREVIEW = True
-        try:
-            if getattr(self, "native", False):
-                tool = next(iter(rp.build_tools(self.obj)), None)
-                if tool is not None and not isinstance(tool, str):
-                    self.obj.AddSubShape = tool
-                    self._preview_update()
-            else:
-                self.obj.recompute()
-        except Exception:
-            pass
-        finally:
-            rp.PREVIEW = False                             # (Gui.updateGui yok: Qt kendisi yeniler, adim basina ~60 ms)
+    # --- duzenleme onizlemesi: hafif boru agi ---
+    # Duzenlerken OCCT hic calismaz: boru, kilavuz boyunca halkalardan yari saydam bir ag olarak cizilir (numpy,
+    # birkac milisaniye; supurme + boolean her adimda zorlaniyordu). Nesnenin kendi sekli gizlenir, onceki govde
+    # (PartDesign BaseFeature) gorunur kalir. OK'e basinca gercek, puruzsuz boru hesaplanir; Cancel'da hicbir sey.
+    def _tube_nodes(self):
+        sub = self.obj.TypeId == "PartDesign::FeatureSubtractivePython"
+        mat = coin.SoMaterial()
+        mat.diffuseColor = (0.9, 0.15, 0.15) if sub else (0.15, 0.85, 0.5)
+        mat.transparency = 0.45
+        hints = coin.SoShapeHints()
+        hints.vertexOrdering = coin.SoShapeHints.UNKNOWN_ORDERING   # iki yuzu de aydinlansin
+        self.t_coord, self.t_mesh = coin.SoCoordinate3(), coin.SoQuadMesh()
+        lm = coin.SoLightModel()
+        lm.model = coin.SoLightModel.BASE_COLOR
+        col = coin.SoBaseColor()
+        col.rgb = (0.1, 0.45, 0.25) if not sub else (0.5, 0.1, 0.1)
+        self.t_lines = coin.SoIndexedLineSet()             # halkalar: sekil okunur
+        self.tube = coin.SoSeparator()
+        for n in (hints, mat, self.t_coord, self.t_mesh, lm, col, self.t_lines):
+            self.tube.addChild(n)
+        self.parent.addChild(self.tube)
 
-    # --- PartDesign onizlemesi (Pad / Pocket duzenlerken oldugu gibi) ---
-    # Onceki govde (BaseFeature) normal gorunur; Rail Pipe'in ekledigi (AddSubShape) yesil, Rail Groove'un oydugu
-    # kirmizi yari saydam onizleme olarak cizilir (FreeCAD'in kendi onizlemesi: ViewProvider.showPreview). Nesnenin
-    # kendi sekli gizlenir (tam saydam, kenarsiz). showPreview olmayan surumlerde: nesne yari saydam.
+    def _tube(self):
+        rings = None if isinstance(self.prof, str) else rp.preview_rings(self.obj, self.prof)
+        if not rings:
+            self.t_mesh.verticesPerRow = 0
+            self.t_mesh.verticesPerColumn = 0
+            self.t_lines.coordIndex.setNum(0)
+            return
+        M = len(rings[0])
+        P = [tuple(self.world(p)) for ring in rings for p in ring + ring[:1]]   # halka kapali: ilk nokta sonda
+        self.t_coord.point.setValues(0, len(P), P)
+        self.t_coord.point.setNum(len(P))
+        self.t_mesh.verticesPerRow = M + 1
+        self.t_mesh.verticesPerColumn = len(rings)
+        idx = []
+        for i in range(0, len(rings), 4):                  # her dorduncu halka cizgi
+            idx += list(range(i * (M + 1), (i + 1) * (M + 1))) + [-1]
+        self.t_lines.coordIndex.setValues(0, len(idx), idx)
+        self.t_lines.coordIndex.setNum(len(idx))
+
     def _preview_on(self):
         vo = self.obj.ViewObject
-        self.saved = dict(t=vo.Transparency, mode=vo.DisplayMode, color=getattr(vo, "PreviewColor", None))
-        base = getattr(self.obj, "BaseFeature", None)     # Part surumunde yok: nesne yari saydam
+        self.saved = dict(vis=vo.Visibility)
+        base = getattr(self.obj, "BaseFeature", None)
         self.saved["base"] = base.ViewObject.Visibility if base is not None else None
-        self.native = hasattr(vo, "showPreview")
-        if not self.native:
-            vo.Transparency = max(vo.Transparency, 60)
-            return
         if base is not None:
             base.ViewObject.Visibility = True
-        sub = self.obj.TypeId == "PartDesign::FeatureSubtractivePython"
-        vo.PreviewColor = (1.0, 0.0, 0.0, 1.0) if sub else (0.0, 1.0, 0.6, 1.0)
-        vo.Transparency = 100
-        vo.DisplayMode = "Shaded"                          # kendi kenarlari onizlemenin kenarlariyla cakisiyordu
-        vo.showPreview(True)
-        self._preview_update()
-
-    def _preview_update(self):
-        if getattr(self, "native", False):
-            try:
-                self.obj.ViewObject.updatePreview()
-            except Exception:
-                pass
+        vo.Visibility = False
 
     def _preview_off(self):
-        vo, sv = self.obj.ViewObject, getattr(self, "saved", None)
+        sv = getattr(self, "saved", None)
         if sv is None:
             return
-        if getattr(self, "native", False):
-            vo.showPreview(False)
-            if sv["color"] is not None:
-                vo.PreviewColor = sv["color"]
-            vo.DisplayMode = sv["mode"]
-            base = getattr(self.obj, "BaseFeature", None)
-            if base is not None and sv["base"] is not None:
-                base.ViewObject.Visibility = sv["base"]
-        vo.Transparency = sv["t"]
-
-    def _coarse(self, on):
-        """Surukleme sirasinda onizleme kaba cizilsin (ucgenleme ~4 kat hizli), birakinca eski incelige donsun."""
-        vo = self.obj.ViewObject
-        if on and getattr(self, "fine", None) is None:
-            self.fine = vo.Deviation
-            vo.Deviation = max(self.fine, 0.5)
-        elif not on and getattr(self, "fine", None) is not None:
-            vo.Deviation, self.fine = self.fine, None
-
-    def _doc_recompute(self):
-        self.doc.recompute()
-        self._preview_update()
+        base = getattr(self.obj, "BaseFeature", None)
+        if base is not None and sv["base"] is not None:
+            base.ViewObject.Visibility = sv["base"]
+        self.obj.ViewObject.Visibility = sv["vis"]
 
     # --- fare ---
     def pick(self, pos, N, radius=12.0):
@@ -309,7 +297,6 @@ class Editor(object):
             self.drag = dict(key=key or ("point", 0), j=j, N=[V(p) for p in N],
                              pts=[V(p) for p in self.obj.GuidePoints], w0=w0, ta=res[1], tb=res[2])
             self.drag["ref"] = self.measure(pos)
-            self._coarse(True)
         self.redraw()
         self.panel.sync()
 
@@ -328,10 +315,6 @@ class Editor(object):
 
     def end_drag(self):
         self.drag = None
-        self.timer.stop()
-        self._coarse(False)
-        self.obj.touch()                                   # onizleme hizli yontemle hesaplanmisti: kaliteli hal
-        self._doc_recompute()
         self.redraw()
         self.panel.sync()
 
@@ -370,8 +353,6 @@ class Editor(object):
         self.obj.GuidePoints = pts
         self.redraw()
         self.panel.sync()
-        if not self.timer.isActive():
-            self.timer.start(120)
 
     # --- panel islemleri ---
     def set_coord(self, axis, val):
@@ -386,7 +367,6 @@ class Editor(object):
             return
         g = dict(j=self.sel, N=[V(p) for p in N], pts=[V(p) for p in self.obj.GuidePoints], w0=w, ta=ta, tb=tb)
         self.move_to(g, self.local_dir(t - w))
-        self._doc_recompute()
 
     def add_point(self):
         """Secili egri parcasinda tiklanan yere; yoksa secili noktadan sonraki parcanin (secim yoksa en uzun
@@ -411,7 +391,6 @@ class Editor(object):
         pts.insert(i, mid)                                 # dugum i + 1 olur
         self.obj.GuidePoints = pts
         self.sel, self.span = i + 1, None
-        self._doc_recompute()
         self.redraw()
         self.panel.sync()
 
@@ -425,14 +404,12 @@ class Editor(object):
         del pts[self.sel - 1]
         self.obj.GuidePoints = pts
         self.sel = None
-        self._doc_recompute()
         self.redraw()
         self.panel.sync()
 
     def set_prop(self, name, val):
         if getattr(self.obj, name) != val:
             setattr(self.obj, name, val)
-            self._doc_recompute()
             self.redraw()
 
     # --- bitis ---
@@ -441,6 +418,7 @@ class Editor(object):
         self.close()
         if ok:
             self.doc.commitTransaction()
+            self.obj.touch()                               # duzenlerken hic hesaplanmadi: simdi gercek boru
         else:
             self.doc.abortTransaction()
         self.doc.recompute()
@@ -452,16 +430,20 @@ class Editor(object):
         if getattr(self, "closed", False):
             return
         self.closed = True
-        self.timer.stop()
         if not getattr(self, "finished", False):            # duzenleme baska yoldan bitti: degisiklikler kalsin
             self.doc.commitTransaction()
+            self.obj.touch()
+            self.doc.recompute()
         try:
             self.view.removeEventCallbackPivy(coin.SoMouseButtonEvent.getClassTypeId(), self.cb_btn)
             self.view.removeEventCallbackPivy(coin.SoLocation2Event.getClassTypeId(), self.cb_mov)
         except Exception:
             pass
         self.zoom.stop()
-        self._coarse(False)
+        try:
+            self.parent.removeChild(self.tube)
+        except Exception:
+            pass
         try:
             self.parent.removeChild(self.gizmo.root)
         except Exception:
