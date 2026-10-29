@@ -17,6 +17,15 @@ any sweep, boolean or interactive PartDesign tool in this repository.
   - `setAuxiliarySpine(aux, True, 0)` with `aux` = a curve through *spine + side vector of our own
     rotation-minimizing frame* fixes the wobble (~0.1 deg). Use **CurvilinearEquivalence = True** only: `False`
     sometimes hangs for more than a minute. Try the side vector at 1x and 2x the profile size.
+    **But** in bends the sections are no longer perpendicular to the spine (the aux curve's arc length differs
+    from the spine's): measured on the motor-test pipes an r = 20 mm pipe varied 16.8 .. 20.4 mm and looked faceted,
+    while CorrectedFrenet without C1 approximation was exactly 20.000 mm. Rail Pipe now tries CorrectedFrenet first.
+  - **Seams of round profiles.** A circle is one closed edge: its seam (vertex) cannot be moved by reordering
+    edges. If the start and end circles' seams are turned against each other, a two-section sweep twists between
+    them and narrows in the middle (hyperboloid waist, 19.3 mm on r = 20). Rebuild the end circle as
+    `Part.Edge(curve, u, u + period)` with `u = curve.parameter(target)` (keep the edge orientation).
+  - Measure sweeps by the distance of surface samples to the spine edge (`edge.distToShape(Part.Vertex(p))`): a
+    round pipe must give its radius everywhere.
   - `setBiNormalMode(plane normal)` works for planar and straight guides, but is sometimes invalid with two
     profiles in a bend. Use it as a fallback.
 - **`setForceApproxC1(True)`** avoids C0 faces, but together with two profiles it can fling the control poles.
@@ -31,6 +40,10 @@ any sweep, boolean or interactive PartDesign tool in this repository.
 - Validate the result **by volume**: fuse = body + tool − common, cut = body − common. A sweep that passes
   `isValid()` can still lose the tool in the boolean.
 - `Shape.check(True)` (BOP check) can take **25 s** on a sharp bend; don't call it inside a recompute.
+- **Several features in one Body.** Boolean only with the Body's solids the tool really touches (bounding box
+  overlap, then `distToShape` = 0, ~0.3 s per solid) and keep the rest as they are. A tool that touches nothing
+  becomes one more solid: count that as a clean result, not as a split. Fusing every new pipe with the whole
+  growing Body (plus refine and the volume check) took 8.6 / 10.6 / 20.5 s for pipes 2-4; now about 1-2 s.
 
 ## PartDesign Python features
 

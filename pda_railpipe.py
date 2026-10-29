@@ -182,6 +182,49 @@ def _volume_ok(base, tool, res, sub, rel=0.005):
         return False
 
 
+def _combine(base, tool, sub, refine):
+    """Boruyu govdeye ekle / govdeden oy: (sonuc, temiz mi) ya da gecersizse None. Boolean yalniz borunun kutusuna
+    giren katilarla yapilir, digerleri oldugu gibi kalir: ayni Body'de birbirine degmeyen her yeni boru butun
+    govdeyle birlestirilip refine / hacim denetiminden geciyordu (motor-test: 4. boru 20 s). Temiz: hacim tutuyor
+    ve hicbir kati bolunmedi (degmeyen yeni boru ayri kati olur, bu bolunme sayilmaz)."""
+    if base is None:
+        return (tool, True) if tool.isValid() else None
+    box = tool.BoundBox                                    # kontrol noktalarina gore: gercek sekilden genis, guvenli
+    box.enlarge(1e-3 * max(box.DiagonalLength, 1.0))
+    near, far = [], []
+    for s in base.Solids:                                  # kutu kesisse de gercekte degmeyen kati (kavisli borular
+        try:                                               # yelpazesi) boolean'a girmez
+            hit = s.BoundBox.intersect(box) and s.distToShape(tool)[0] <= 1e-6
+        except Exception:
+            hit = True
+        (near if hit else far).append(s)
+    if near:
+        part = near[0] if len(near) == 1 else Part.makeCompound(near)
+        r = part.cut(tool) if sub else part.fuse(tool)
+        if refine:
+            r = r.removeSplitter()
+        if not r.isValid() or (not r.Solids and not sub):
+            return None
+        try:
+            common = part.common(tool).Volume
+        except Exception:
+            return None
+        want = part.Volume - common if sub else part.Volume + tool.Volume - common
+        if abs(r.Volume - want) > 0.005 * max(part.Volume, tool.Volume, 1e-9):
+            return None
+        touched = common > 1e-9 * max(tool.Volume, 1e-9)
+        clean = len(r.Solids) <= len(near) + (0 if sub or touched else 1)
+        solids = far + r.Solids
+    else:                                                  # boru hicbir kati ile kesismiyor
+        if not tool.isValid():
+            return None
+        clean = True
+        solids = far if sub else far + [tool]
+    if not solids:
+        return None
+    return (solids[0] if len(solids) == 1 else Part.makeCompound(solids)), clean
+
+
 def _bop_clean(sh):
     try:
         sh.check(True)
@@ -203,8 +246,24 @@ def _oriented(w, along):
 
 
 def _start_near(w, p):
-    """Teli, baslangic noktasi p'ye en yakin kenardan baslayacak sekilde yeniden diz (supurmede koseler eslesir)."""
+    """Teli, baslangic noktasi p'ye en yakin kenardan baslayacak sekilde yeniden diz (supurmede koseler eslesir).
+    Tek kenarli kapali tel (daire, elips, periyodik spline): dikis noktasi p'nin izdusumune tasinir; yoksa iki
+    daire arasindaki supurme dikisler arasindaki aci kadar burulup ortada inceliyordu (r=20 boruda 19.3 mm)."""
     E = w.OrderedEdges
+    if len(E) == 1:
+        e = E[0]
+        c = e.Curve
+        try:
+            if not (e.isClosed() and c.isPeriodic()):
+                return w
+            u = c.parameter(p)
+            per = c.LastParameter - c.FirstParameter
+            ne = Part.Edge(c, u, u + per)
+            if e.Orientation == "Reversed":
+                ne.reverse()
+            return Part.Wire([ne])
+        except Exception:
+            return w
     if len(E) < 2:
         return w
     k = min(range(len(E)), key=lambda i: (E[i].Vertexes[0].Point - p).Length)
@@ -348,24 +407,23 @@ def build_tools(obj):
     binormal = _plane_normal([ca] + N[1:] + [end], ta)
     err = "Rail Pipe: the sweep gave no solid"
     # sirayla denenir, gecerli ve egrinin cevresinde kalan ilk sonuc alinir:
-    # 1. yardimci omurga: kendi burulmasiz cercevemizin (egri boyunca en kisa donmelerle tasinan yan yon) ucundan
-    #    gecen egri kesitin yonunu verir. CorrectedFrenet kesiti egri boyunca birkac derece salindiriyordu (dikis
-    #    ve kenar cizgileri borunun cevresinde dalgali, ~2 mm r=40'ta); bununla ~0.01 derece.
-    # 2. CorrectedFrenet (egrilige dayanir, duz cizgide tanimsiz kalip 'No geometry' veriyordu).
+    # 1. CorrectedFrenet, once C1 yaklasimsiz: kesit egriye tam dik (motor-test borularinda r=20 boru 20.000 mm).
+    #    Kesit egri boyunca birkac derece salinabiliyor (dikis cizgisi dalgali; yuvarlak profilde gorunmez). Duz
+    #    cizgide tanimsiz ('No geometry'): o zaman sonrakiler.
+    # 2. yardimci omurga (kendi burulmasiz cercevemizin yan yonunden gecen egri, egrisel eslesme + C1): salinim
+    #    yok ama kivrimda kesit egriye dik kalmiyor, boru yer yer yassilasiyor (r=20 boruda 16.8-20.4 mm, yuzey
+    #    kirik kirik gorunuyordu); bu yuzden ikinci sirada.
     # 3. duzlemsel egride sabit binormal (duz cizgide de calisir, ama iki profilli kivrimda bazen gecersiz).
-    # Her birinde once C1 yaklasim (C0 kenar / yuz kalirsa sonraki boolean'lar bozuluyor), sonra C1'siz (iki
-    # profilde C1 yaklasim yuzeyi savurabiliyor).
+    # C1'siz sonuc C0 kenar birakip sonraki boolean'i bozabilir: dogruluk boolean sonucunun hacmiyle denetlenir
+    # (RailPipe.execute), tutmazsa siradaki (C1 yaklasimli) denenir. BOP kontrolu sert kivrimda 25 s
+    # surebiliyordu, kullanilmaz.
     size = max(wa.BoundBox.DiagonalLength, 1.0)
     auxs = [] if PREVIEW else [a for a in (_aux_spine(bs, ta, first - ca, size * k) for k in (1.0, 2.0)) if a]
-    # Yardimci omurga OCCT'de kirilgan: bazi ayarlarda isValid gecip ici bozuk kati veriyor, sonraki boolean boruyu
-    # kaybediyordu; egrisel eslesme kapaliyken bazen dakikalarca takiliyor. Olcumlerde egrisel eslesme + C1 hic
-    # takilmadi: yalniz o denenir, yardimci egri profil boyu ve iki kati uzakta (~0.3-1 s), sonra CorrectedFrenet.
-    # Dogruluk boolean sonucunun hacmiyle denetlenir (RailPipe.execute); BOP kontrolu sert kivrimda 25 s
-    # surebiliyordu. Ekranda surukleme sirasinda (PREVIEW) hic denenmez: birakinca kaliteli hali hesaplanir.
-    tries = [(("aux", a, True), True) for a in auxs]
-    tries += [((m, a, None), c1) for m, a in [("frenet", None)] + ([("binormal", binormal)] if binormal is not None
-                                                                    else []) for c1 in ((False, True) if PREVIEW
-                                                                                        else (True, False))]
+    # Yardimci omurga OCCT'de kirilgan: egrisel eslesme kapaliyken bazen dakikalarca takiliyor; yalniz egrisel
+    # eslesme + C1 denenir (profil boyu ve iki kati uzakta). Surukleme sirasinda (PREVIEW) hic denenmez.
+    tries = [(("frenet", None, None), c1) for c1 in (False, True)]
+    tries += [(("aux", a, True), True) for a in auxs]
+    tries += [(("binormal", binormal, None), c1) for c1 in (False, True)] if binormal is not None else []
     given = False
     for (mode, arg, cureq), c1 in tries:
         ps = Part.BRepOffsetAPI.MakePipeShell(spine)
@@ -425,23 +483,19 @@ class RailPipe:
             base = None
         sub = obj.TypeId == "PartDesign::FeatureSubtractivePython"
         first = None
-        # boolean sonucu da denetlenir: gecersizse, govde tek katiyken bolunduyse ya da hacmi tutmuyorsa (ekleme:
-        # govde + boru - kesisim, oyma: govde - kesisim; supurme tek basina temiz gorunup boolean'da boruyu
-        # kaybedebiliyordu) siradaki supurme denenir; hicbiri olmazsa ilk gecerli sonuc
+        # boolean sonucu da denetlenir: gecersizse, bir kati bolunduyse ya da hacmi tutmuyorsa (ekleme: govde + boru
+        # - kesisim, oyma: govde - kesisim; supurme tek basina temiz gorunup boolean'da boruyu kaybedebiliyordu)
+        # siradaki supurme denenir; hicbiri olmazsa ilk gecerli sonuc
         for tool in build_tools(obj):
             if isinstance(tool, str):
                 raise RuntimeError(T(tool))
-            res = tool if base is None else base.cut(tool) if sub else base.fuse(tool)
-            if obj.Refine:
-                res = res.removeSplitter()
-            if not res.isValid() or not res.Solids:
-                continue
-            if base is not None and not _volume_ok(base, tool, res, sub):
+            res = _combine(base, tool, sub, obj.Refine)
+            if res is None:
                 continue
             if first is None:
-                first = (tool, res)
-            if base is None or len(res.Solids) <= max(len(base.Solids), 1):
-                first = (tool, res)
+                first = (tool, res[0])
+            if res[1]:
+                first = (tool, res[0])
                 break
         if first is None:
             raise RuntimeError(T("Rail Pipe: the sweep gave an invalid solid"))

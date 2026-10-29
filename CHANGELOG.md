@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Rail Pipe surface: the pipe is now exactly round along its whole length. The sweep first tries CorrectedFrenet
+  without C1 approximation (the auxiliary-spine mode tilted the sections in bends: an r=20 pipe varied between
+  16.8 and 20.4 mm and looked faceted); a circle end profile gets its seam aligned with the start profile (the
+  two circles' seams were turned against each other and the pipe narrowed in the middle, 19.3 mm).
+- Rail Pipe speed with several pipes in one Body: the boolean only involves the solids the new pipe really
+  touches, and a new pipe that touches nothing no longer counts as a split result (that made every later pipe
+  try all sweep modes with full booleans: motor-test pipes 2-4 took 8.6 / 10.6 / 20.5 s, now about 1-2 s).
 - Documents made with FcSubDModelerWB's Rail Pipe copy (subd_railpipe) open with this add-in: their Rail Pipe /
   Groove objects are linked to it automatically (same properties); save the document to keep it.
 - Renamed to **Pimp My PartDesign** (workbench, toolbar, menu, Addon Manager name). Command names, the `pda_`
