@@ -31,7 +31,7 @@ class PimpMyPartDesignWorkbench(Gui.Workbench):
 
 class _PartDesignTools:
     """Araclar PartDesign'in "Part Design Modeling Features" arac cubugunda (secenek dugmesi de: kendi Body'si) ve Part
-    workbench'te Part Sweep'in yaninda da olsun (FreeCAD 1.0+ workbench manipulator; Part'ta yalniz Rail Pipe: Body
+    workbench'te Part Tools arac cubugunun sonunda da olsun (FreeCAD 1.0+ workbench manipulator; Part'ta yalniz Rail Pipe: Body
     disinda kendi basina kati)."""
 
     def modifyToolBars(self):
@@ -43,8 +43,8 @@ class _PartDesignTools:
         if wb == "PartDesignWorkbench":
             return [{"append": c, "toolBar": "Part Design Modeling Features"}
                     for c in pda_commands.COMMANDS + pda_commands.OPTIONS]
-        if wb == "PartWorkbench":
-            return [{"insert": "PDA_RailPipe", "toolItem": "Part_Sweep"}]
+        if wb == "PartWorkbench":                          # ("insert" + "toolItem": Part_Sweep yerlesmiyordu)
+            return [{"append": "PDA_RailPipe", "toolBar": "Part Tools"}]
         return []
 
 

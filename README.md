@@ -32,7 +32,7 @@ Sweeps a profile along a guide curve and adds it to the Body (**Rail Pipe**) or 
   also under *Options* in the task panel) each new pipe gets its own Body; its profiles are bound with
   SubShapeBinders, so the pipes don't recompute and fuse together on every change. Fuse the Bodies later if you
   need one solid.
-- **Part workbench:** the Rail Pipe button also sits next to Part's Sweep. There the pipe is a standalone solid
+- **Part workbench:** the Rail Pipe button is at the end of the Part Tools toolbar. There the pipe is a standalone solid
   outside any Body (profiles can be faces or sketches of any object, read in global coordinates); add it to or
   cut it from a shape with Part Fuse / Cut. Editing on screen works the same way.
 

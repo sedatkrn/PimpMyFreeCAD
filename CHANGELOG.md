@@ -5,7 +5,7 @@
 - Rail Pipe in its own Body (option: checkable button in PartDesign's toolbar and the add-in's menu, also under
   *Options* in the task panel): each new pipe gets a new Body with its profiles bound by SubShapeBinders, so
   pipes no longer recompute and fuse together (motor-test pipe 1: 0.15 s).
-- Rail Pipe in the Part workbench (button next to Part Sweep): a standalone Part solid outside any Body, profiles
+- Rail Pipe in the Part workbench (button at the end of the Part Tools toolbar): a standalone Part solid outside any Body, profiles
   from any object read in global coordinates, no boolean (use Part Fuse / Cut). Same on-screen editing.
 - A closed wire without a face (e.g. a SubShapeBinder of a sketch) works as a profile.
 - Rail Pipe surface: the pipe is now exactly round along its whole length. The sweep first tries CorrectedFrenet
