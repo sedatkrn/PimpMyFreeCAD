@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Rail Pipe: a profile face that belongs to no solid (SubShapeBinder of a face, a lone face) no longer sends
+  the pipe out of its back side: like a sketch, it leaves towards the other profile. A binder or sketch that
+  lies on the Body's surface is treated like the Body's own face (outward, end carried into the body, so the
+  fuse no longer splits or comes out empty). A single-face object picked in the tree is accepted.
+
 ## 0.1.0 (2026-10-29)
 
 First release. Rail Pipe / Rail Groove moved here from FcSubDModelerWB.

@@ -27,9 +27,10 @@ def _is_sketch(o):
 
 
 def profile(link):
-    """PropertyLinkSub'tan profil: (dis tel, merkez, normal, yuz mu) ya da None / hata metni. Yuz: katinin duz yuzu,
-    normali disari bakar. Sketch (alt eleman yok ya da kenar): en buyuk kapali teli, normali sketch duzleminin Z'si
-    (isareti sonra egriye gore secilir)."""
+    """PropertyLinkSub'tan profil: (dis tel, merkez, normal, katinin yuzu mu) ya da None / hata metni. Katinin duz
+    yuzu: normali disari bakar, boru oradan cikar. Sketch (alt eleman yok ya da kenar): en buyuk kapali teli, normali
+    sketch duzleminin Z'si. Katisi olmayan yuz (SubShapeBinder, tek basina yuz / kabuk; alt eleman yoksa tek yuzu):
+    normalinin yonu rastgele (Binder'da boru ters taraftan cikiyordu), sketch gibi isareti egriye gore secilir."""
     if not link or link[0] is None:
         return None
     o, subs = link[0], list(link[1] or [])
@@ -45,12 +46,14 @@ def profile(link):
             f = o.Shape.getElement(subs[0])
         except Exception:
             f = None
+    elif len(o.Shape.Faces) == 1:                          # agacta secilen tek yuzlu nesne (or. Binder)
+        f = o.Shape.Faces[0]
     if f is None or f.ShapeType != "Face":
         return "Rail Pipe: the start face is missing"
     if not (f.isPlanar() if hasattr(f, "isPlanar") else f.Surface.TypeId == "Part::GeomPlane"):
         return "Rail Pipe: the start face must be flat"
     c, n = face_frame(f)
-    return f.OuterWire, c, n, True
+    return f.OuterWire, c, n, bool(o.Shape.Solids)
 
 
 def face_frame(f):
@@ -208,15 +211,49 @@ def _start_near(w, p):
     return Part.Wire(E[k:] + E[:k])
 
 
+def _on_body(p, base):
+    """Govdenin yuzeyinde duran profil (govdenin kendi yuzunun Binder'i, yuze cizilmis sketch): katinin yuzu gibi
+    davranilir; normali govdenin disina cevrilir, uc govdenin icine tasirilir. Yoksa cakisan yuzler boolean'i
+    bozuyordu (sonuc bos ya da iki ayri kati) ve her basarisiz deneme saniyeler suruyordu."""
+    if p is None or p[3] or base is None or base.isNull() or not base.Solids:
+        return p
+    w, c, n, _ = p
+    size = max(w.BoundBox.DiagonalLength, 1.0)
+    try:
+        # yuzun icinden ornek noktalar: cogu govdenin yuzeyindeyse profil govdenin uzerinde. Yalniz kose noktalari
+        # yaniltiyordu: delik agzini kapatan disk (Binder) kenariyla govdeye degiyor ama uzerinde degil.
+        f = Part.Face(w)
+        u0, u1, v0, v1 = f.ParameterRange
+        on, inner, e = [], 0, 1e-3 * size
+        for i in range(1, 6):
+            for j in range(1, 6):
+                q = f.Surface.value(u0 + (u1 - u0) * i / 6.0, v0 + (v1 - v0) * j / 6.0)
+                if not f.isInside(q, 1e-6, True):
+                    continue
+                inner += 1
+                if base.distToShape(Part.Vertex(q))[0] <= 1e-4 * size:
+                    on.append(q)
+        if not inner or len(on) < 0.6 * inner:
+            return p
+        vote = sum(int(base.isInside(q + n * e, 1e-7, False)) - int(base.isInside(q - n * e, 1e-7, False))
+                   for q in on)                            # hangi yan govdenin ici (cogunluk)
+        if vote > 0:                                       # normal govdenin icine bakiyor: disa cevir
+            n = -n
+    except Exception:
+        return p
+    return w, c, n, True
+
+
 def _directions(pa, pb, pts, sub, reversed_):
-    """A'dan cikis (ta) ve B'ye giris (tb) yonu. Yuz: Pipe disari, Groove iceri (Reversed cevirir); sketch: normalin
-    isareti egrinin gittigi yone (ilk kilavuz noktasina / B'ye; B'de: son noktadan B'ye) gore, Reversed cevirir."""
+    """A'dan cikis (ta) ve B'ye giris (tb) yonu. Katinin yuzu: Pipe disari, Groove iceri (Reversed cevirir); sketch
+    ya da katisiz yuz (Binder): normalin isareti obur profile (tek profilde ilk kilavuz noktasina) dogru; B'de son
+    noktadan B'ye. Reversed cevirir."""
     out = -1.0 if (sub != bool(reversed_)) else 1.0
     wa, ca, na, face_a = pa
     if face_a:
         ta = na * out
     else:
-        to = pts[0] if pts else (pb[1] if pb is not None else ca + na)
+        to = pb[1] if pb is not None else (pts[0] if pts else ca + na)   # iki profilde obur profile dogru
         ta = na if na.dot(to - ca) >= 0 else -na
         if reversed_:
             ta = -ta
@@ -240,6 +277,8 @@ def guide_nodes(obj):
     if isinstance(pb, str):
         return pb
     pts = list(obj.GuidePoints)
+    base = obj.BaseFeature.Shape if obj.BaseFeature is not None else None
+    pa, pb = _on_body(pa, base), _on_body(pb, base)
     ta, tb = _directions(pa, pb, pts, obj.TypeId == "PartDesign::FeatureSubtractivePython", obj.Reversed)
     return [pa[1]] + pts + ([pb[1]] if pb is not None else []), ta, tb
 
@@ -268,6 +307,8 @@ def build_tools(obj):
     if pb is None and not pts:
         yield "Rail Pipe: a free end needs at least one guide point"
         return
+    base = obj.BaseFeature.Shape if obj.BaseFeature is not None else None
+    pa, pb = _on_body(pa, base), _on_body(pb, base)
     ta, tb = _directions(pa, pb, pts, obj.TypeId == "PartDesign::FeatureSubtractivePython", obj.Reversed)
     ca = pa[1]
     N = [ca] + pts + ([pb[1]] if pb is not None else [])
@@ -486,6 +527,8 @@ def make(body, start, end=None, subtractive=False):
     for p in (pa, pb):
         if isinstance(p, str):
             return p
+    base = body.Tip.Shape if getattr(body, "Tip", None) is not None else None   # yeni adimin BaseFeature'i
+    pa, pb = _on_body(pa, base), _on_body(pb, base)
     obj = body.newObject("PartDesign::FeatureSubtractivePython" if subtractive else "PartDesign::FeatureAdditivePython",
                          "RailGroove" if subtractive else "RailPipe")
     RailPipe(obj)
