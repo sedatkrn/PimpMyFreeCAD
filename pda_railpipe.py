@@ -543,12 +543,14 @@ def make(body, start, end=None, subtractive=False):
 
 
 def repair_proxies(doc):
-    """Proxy'si kopmus Rail Pipe / Groove nesnelerini onar (FreeCAD bazen eklenti modulunu belge acilirken ice aktaramiyor)."""
+    """Proxy'si kopmus Rail Pipe / Groove nesnelerini onar (FreeCAD bazen eklenti modulunu belge acilirken ice
+    aktaramiyor) ve FcSubDModelerWB'nin eski subd_railpipe kopyasiyla yapilmis nesneleri bu modulun siniflarina
+    tasi (ozellikler ayni; belge bir kez kaydedilince artik bu eklentiye bagli)."""
     fixed = []
     for o in (doc.Objects if doc is not None else []):
-        if PROPS in getattr(o, "PropertiesList", []) and type(getattr(o, "Proxy", None)).__name__ != "RailPipe":
+        if PROPS in getattr(o, "PropertiesList", []) and not isinstance(getattr(o, "Proxy", None), RailPipe):
             o.Proxy = RailPipe.__new__(RailPipe)
-            if App.GuiUp and type(getattr(o.ViewObject, "Proxy", None)).__name__ != "ViewProviderRailPipe":
+            if App.GuiUp and not isinstance(getattr(o.ViewObject, "Proxy", None), ViewProviderRailPipe):
                 vp = ViewProviderRailPipe.__new__(ViewProviderRailPipe)
                 o.ViewObject.Proxy = vp
             o.touch()

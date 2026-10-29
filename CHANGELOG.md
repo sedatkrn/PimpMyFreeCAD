@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Documents made with FcSubDModelerWB's Rail Pipe copy (subd_railpipe) open with this add-in: their Rail Pipe /
+  Groove objects are linked to it automatically (same properties); save the document to keep it.
 - Renamed to **Pimp My PartDesign** (workbench, toolbar, menu, Addon Manager name). Command names, the `pda_`
   modules and documents made with 0.1.0 are unchanged; the language setting moved to
   `Preferences/Mod/PimpMyPartDesign`.

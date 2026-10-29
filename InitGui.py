@@ -45,12 +45,16 @@ class _PartDesignTools:
 
 class _RestoreObserver:
     """Belge acilinca: Proxy'si kopmus Rail Pipe / Groove nesnelerini onar (FreeCAD eklenti modulunu belge acilirken
-    ice aktaramadiysa sekil guncellenmez)."""
+    ice aktaramadiysa sekil guncellenmez) ve FcSubDModelerWB'nin eski subd_railpipe nesnelerini bu eklentiye tasi."""
 
     def slotFinishRestoreDocument(self, doc):
-        if any("GuidePoints" in o.PropertiesList and getattr(o, "Proxy", None) is None for o in doc.Objects):
+        if any("GuidePoints" in o.PropertiesList and type(getattr(o, "Proxy", None)).__module__ != "pda_railpipe"
+               for o in doc.Objects):
             import pda_railpipe
-            pda_railpipe.repair_proxies(doc)
+            n = len(pda_railpipe.repair_proxies(doc))
+            if n:
+                App.Console.PrintMessage("Pimp My PartDesign: %d Rail Pipe / Groove object(s) linked to this add-in "
+                                         "in %s (save the document to keep it)\n" % (n, doc.Name))
 
 
 import FreeCAD as App
