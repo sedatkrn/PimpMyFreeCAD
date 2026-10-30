@@ -50,9 +50,22 @@ class _PartDesignTools:
 
 class _RestoreObserver:
     """Belge acilinca: Proxy'si kopmus Rail Pipe / Groove nesnelerini onar (FreeCAD eklenti modulunu belge acilirken
-    ice aktaramadiysa sekil guncellenmez) ve FcSubDModelerWB'nin eski subd_railpipe nesnelerini bu eklentiye tasi."""
+    ice aktaramadiysa sekil guncellenmez) ve FcSubDModelerWB'nin eski subd_railpipe nesnelerini bu eklentiye tasi.
+    26.3'te slotFinishRestoreDocument gelmiyor: belge etkinlesince, yukleme bittikten sonra bakilir."""
 
-    def slotFinishRestoreDocument(self, doc):
+    def slotActivateDocument(self, doc):
+        from PySide import QtCore                          # InitGui exec ile calisir: burada modul adlari gorunmez
+        QtCore.QTimer.singleShot(0, lambda name=doc.Name, self=self: self.repair(name))
+
+    def repair(self, name):
+        import FreeCAD as App
+        from PySide import QtCore
+        doc = App.listDocuments().get(name)
+        if doc is None:
+            return
+        if doc.Restoring:
+            QtCore.QTimer.singleShot(200, lambda name=name, self=self: self.repair(name))
+            return
         if any("GuidePoints" in o.PropertiesList and type(getattr(o, "Proxy", None)).__module__ != "pda_railpipe"
                for o in doc.Objects):
             import pda_railpipe

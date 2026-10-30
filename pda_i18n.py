@@ -189,6 +189,10 @@ TR = {
         'Raylı boru: başlangıç yüzü düz olmalı',
     'Rail Pipe: the sweep failed (%s)':
         'Raylı boru: süpürme başarısız (%s)',
+    'Rail Pipe: the guide bends tighter (radius %.1f mm) than the profile (%.1f mm), the pipe folds onto itself. '
+    'Move the guide points to widen the bend':
+        'Raylı boru: kılavuz profilden dar kıvrılıyor (yarıçap %.1f mm, profil %.1f mm), boru kendi üstüne katlanıyor. '
+        'Kıvrımı genişletmek için kılavuz noktalarını taşıyın',
     'Rail Pipe: the sweep gave an invalid solid':
         'Raylı boru: süpürme geçersiz bir katı verdi (eğri çok dar kıvrılıyor olabilir)',
     'Rail Pipe: the sweep gave no solid':

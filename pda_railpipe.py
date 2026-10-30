@@ -20,6 +20,7 @@ V = App.Vector
 PROPS = "GuidePoints"     # bu ozellik varsa nesne Rail Pipe / Groove'dur (onarim, komutlar)
 PREVIEW = False           # ekranda surukleme sirasinda True: yavas (kaliteli) supurme yontemi atlanir
 LAST_MODE = None          # son supurmenin yontemi (tani)
+LAST_BEND = None          # son kilavuz: (egri, A teli, A merkezi); hata metni icin
 
 
 def _is_sketch(o):
@@ -526,6 +527,8 @@ def build_tools(obj):
     fb = pb
     bs = guide_spline(N, ta, tb, obj.Tension, ea, eb)
     spine = Part.Wire(bs.toShape())
+    global LAST_BEND
+    LAST_BEND = (bs, pa[0], ca)
     wa = _oriented(pa[0], ta).copy()
     wa.translate(-ta * ea)
     ca = ca - ta * ea
@@ -656,13 +659,25 @@ def build_tools(obj):
         yield err[0]
 
 
+def _tight_bend():
+    """Son kilavuz, profilin yaricapindan dar kivriliyorsa (kilavuz yaricapi, profil yaricapi); degilse None. Boyle
+    kivrimda ic duvar kendi ustune katlanir, boolean'lar tutarsizlasir (olculdu: r=25 boruda yalniz R < 25'te hata)."""
+    if LAST_BEND is None:
+        return None
+    bs, wire, c = LAST_BEND
+    r = max((p - c).Length for p in wire.discretize(Number=64))
+    a, b = bs.FirstParameter, bs.LastParameter
+    k = max(bs.curvature(a + (b - a) * i / 500.0) for i in range(501))
+    return (1.0 / k, r) if k * r > 1.0 else None
+
+
 def _stations(e, K, sub=12):
     """Kenar boyunca esit aralikli K + 1 istasyon: (nokta, teget, baslangictan buraya burulmasiz tasima donmesi).
     Tasima K * sub kucuk adimda en kisa donmelerin carpimi (Rail bridge'in cercevesi gibi)."""
     L = e.Length
     R, prev, out = App.Rotation(), e.tangentAt(e.getParameterByLength(0.0)), []
     for k in range(K * sub + 1):
-        u = e.getParameterByLength(L * k / float(K * sub))
+        u = e.getParameterByLength(min(L * k / float(K * sub), L))   # son adim yuvarlamayla L'yi asabiliyor (ValueError)
         t = e.tangentAt(u)
         R = App.Rotation(prev, t).multiply(R)
         prev = t
@@ -765,18 +780,32 @@ class RailPipe:
         # boolean sonucu da denetlenir: gecersizse, bir kati bolunduyse ya da hacmi tutmuyorsa (ekleme: govde + boru
         # - kesisim, oyma: govde - kesisim; supurme tek basina temiz gorunup boolean'da boruyu kaybedebiliyordu)
         # siradaki supurme denenir; hicbiri olmazsa ilk gecerli sonuc
+        done = False
         for tool in build_tools(obj):
             if isinstance(tool, str):
                 raise RuntimeError(T(tool))
-            res = _combine(base, tool, sub, getattr(obj, "Refine", False))
-            if res is None:
-                continue
-            if first is None:
-                first = (tool, res[0])
-            if res[1]:
-                first = (tool, res[0])
+            # kivrimda ic duvar govdeye teget gibi degince toleranssiz boolean kararsiz (olculdu): 0.01 ile kurtarilabiliyor
+            for fuzzy in (0.0, 0.01):
+                try:
+                    res = _combine(base, tool, sub, getattr(obj, "Refine", False), fuzzy)
+                except Exception:                          # or. removeSplitter: 'FuseEdges : Curve must be closed'
+                    res = None
+                if res is None:
+                    continue
+                if first is None:
+                    first = (tool, res[0])
+                if res[1]:
+                    first = (tool, res[0])
+                    done = True
+                    break
+            if done:
                 break
         if first is None:
+            tight = _tight_bend()
+            if tight:
+                raise RuntimeError(T("Rail Pipe: the guide bends tighter (radius %.1f mm) than the profile "
+                                     "(%.1f mm), the pipe folds onto itself. Move the guide points to widen the bend")
+                                   % tight)
             raise RuntimeError(T("Rail Pipe: the sweep gave an invalid solid"))
         if hasattr(obj, "AddSubShape"):
             obj.AddSubShape = first[0]

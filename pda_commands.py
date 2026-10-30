@@ -139,16 +139,19 @@ class _MagicLoft:
             App.Console.PrintWarning(T(new) + "\n")
             return
         doc.recompute()
-        doc.commitTransaction()
         for p in prof + guides:                            # PartDesign gibi: kullanilan sketch'ler gizlenir
             if not p[1] and hasattr(p[0], "ViewObject") and p[0].ViewObject is not None:
                 p[0].ViewObject.Visibility = False
         if getattr(new, "BaseFeature", None) is not None and "Invalid" not in new.State:
             new.BaseFeature.ViewObject.Visibility = False
             new.ViewObject.Visibility = True
+        doc.commitTransaction()
         Gui.Selection.clearSelection()
         Gui.Selection.addSelection(new)
+        import pda_magicloft_gui                           # panelin Cancel'i bu olusturma adimini da geri alir
+        pda_magicloft_gui.fresh = new
         Gui.ActiveDocument.setEdit(new, 0)
+        pda_magicloft_gui.fresh = None
 
 
 def _edge_profiles(so):

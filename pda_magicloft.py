@@ -177,7 +177,8 @@ def _align(secs):
     u = np.arange(90) / 90.0
     ts = np.arange(360) / 360.0
     for a, b in zip(secs, secs[1:]):
-        if b.n.dot(a.n) < 0:
+        chord = (b.c - a.c) / max(np.linalg.norm(b.c - a.c), 1e-12)
+        if b.n.dot(a.n + chord) < 0:                       # 90 derece kesitte a.n yon vermez: yol yonu de sayilir
             b.flip()
         R = App.Rotation(V(*a.n), V(*b.n))
         pa = a.at(u) - a.c
@@ -256,7 +257,7 @@ def spline_weights(vn, vq, clamp0, clamp1):
         A[0, 0] = 1
     if clamp1:
         A[-1, -2:] = h[-1], 2 * h[-1]
-        Ry[-1, -2], Ry[-1, -1], Ry[-1, m + 1] = 6 / h[-1], -6 / h[-1], 6
+        Ry[-1, m - 2], Ry[-1, m - 1], Ry[-1, m + 1] = 6 / h[-1], -6 / h[-1], 6
     else:
         A[-1, -1] = 1
     S = np.linalg.solve(A, Ry)                             # (m, m + 2) ikinci turevler

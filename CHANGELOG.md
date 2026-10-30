@@ -7,6 +7,18 @@
   edited on screen, Free / Normal / Tangent ends, connector points and a zebra display. The surface is a low-pole
   B-spline built without OCCT sweeps: a recompute took 40-260 ms on the test shapes, a drag step about 6 ms, and
   Thickness and STEP passed. Known limit: PartDesign Thickness gives no wall on a corner-to-round transition.
+- Magic Loft fixes: a Normal / Tangent end on the last profile no longer flings the surface far away (it could reach
+  the profile from behind); profiles at 90 degrees keep the same turning sense; Cancel right after the command now
+  removes the new feature and brings back Tip and visibility, and Cancel on a re-edit really restores the old values.
+- Saved documents keep their parametric chain: with the add-in junctioned into Mod, FreeCAD 26.3 blocked the import of
+  pda_magicloft / pda_railpipe on open, so features opened without their code. The modules now load at start-up. The
+  repair of such objects never ran (its signal doesn't fire in 26.3); it now runs when a document becomes active, so
+  documents already saved in the broken state recover on open.
+- Rail Pipe: at some guide positions (12 of 40 on a test file) the last step along the guide rounded just past its
+  length. The editing preview then vanished, and the real pipe silently lost its best sweep method. Fixed.
+- Rail Pipe on tight bends: when the inner wall grazes the body, the boolean now retries with a tolerance instead of
+  failing, and a failed refine no longer stops the other sweep methods. If nothing works and the guide bends tighter
+  than the profile radius, the error says so with both radii.
 - Rail Pipe / Rail Groove profiles can now be **closed edges**: a circular edge, or several edges that form a closed
   flat loop. Select them on a solid, a Binder or a free face (two loops give two profiles). An edge around a real face
   of a solid acts like that face (the pipe leaves outwards); a hole mouth also leaves outwards, without overlapping

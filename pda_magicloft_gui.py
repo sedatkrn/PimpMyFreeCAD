@@ -19,7 +19,8 @@ from pda_i18n import T
 
 V = App.Vector
 _editor = None
-STRIPES = 32                                               # zebra dokusu: 16 acik, 16 koyu serit
+fresh = None                                               # komutun yeni olusturdugu nesne: Cancel onu da geri alir
+STRIPES = 32                                              # zebra dokusu: 16 acik, 16 koyu serit
 PREVIEW_ALPHA = 0.3                                        # gercek yuzey onizlemesinin saydamligi (zebra opak kalir)
 
 
@@ -88,6 +89,7 @@ class Editor(object):
         self.show_preview = sm._param().GetBool("MagicLoftPreview", True)
         self.zebra = sm._param().GetBool("MagicLoftZebra", False)
         self.error = None
+        self.fresh = obj.Name if fresh is obj else None
         self.doc.openTransaction(T("Edit Magic Loft"))
         self.r_coord, self.r_line = coin.SoCoordinate3(), coin.SoLineSet()
         self.f_coord, self.f_pts = coin.SoCoordinate3(), coin.SoPointSet()
@@ -625,15 +627,17 @@ class Editor(object):
     def finish(self, ok):
         self.finished = True
         self.close()
+        global _editor
+        _editor = None
         if ok:
             self.doc.commitTransaction()
             self.obj.touch()
         else:
-            self.doc.abortTransaction()
-        self.doc.recompute()
-        global _editor
-        _editor = None
+            self.doc.abortTransaction()                    # resetEdit acik islemi kapatir: once geri alinir
         Gui.ActiveDocument.resetEdit()
+        while not ok and self.fresh and self.doc.getObject(self.fresh) is not None and self.doc.UndoCount:
+            self.doc.undo()                                # yeni nesne: olusturma adimi da gider
+        self.doc.recompute()
 
     def close(self):
         if getattr(self, "closed", False):
