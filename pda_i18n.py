@@ -45,6 +45,88 @@ def T(text):
 
 
 TR = {
+    'Magic Loft':
+        'Sihirli Loft',
+    'Magic Loft Cut':
+        'Sihirli Loft Oyma',
+    'Edit Magic Loft':
+        'Sihirli Loft düzenle',
+    'PartDesign: add a clean loft through two or more closed profiles (also 3D edge loops), with selected or automatic guides. Open curves in the selection become guides':
+        'PartDesign: iki ya da daha fazla kapalı profilden (3B kenar halkaları da) temiz loft ekler; rehberler seçilir ya da otomatik oluşur. Seçimdeki açık eğriler rehber olur',
+    'PartDesign: cut a loft through two or more closed profiles, with selected or automatic guides':
+        'PartDesign: iki ya da daha fazla kapalı profilden loft oyar; rehberler seçilir ya da otomatik oluşur',
+    'Magic Loft: select at least two closed profiles (flat faces, closed edge loops or closed sketches); open curves become guides.\n':
+        "Sihirli Loft: en az iki kapalı profil seçin (düz yüz, kapalı kenar halkası ya da kapalı sketch); açık eğriler rehber olur.\n",
+    'Magic Loft: the profiles must belong to a PartDesign Body.\n':
+        "Sihirli Loft: profiller bir PartDesign Body'ye ait olmalı.\n",
+    'Magic Loft: at least two profiles are needed':
+        'Sihirli Loft: en az iki profil gerekir',
+    'Magic Loft: profile %d: %s':
+        'Sihirli Loft: profil %d: %s',
+    'Magic Loft: two profiles are on top of each other':
+        'Sihirli Loft: iki profil üst üste',
+    'Magic Loft: the profiles are on top of each other':
+        'Sihirli Loft: profiller üst üste',
+    'Magic Loft: Tangent needs a solid face next to profile %d':
+        'Sihirli Loft: Yüzeye teğet için profil %d yanında bir katı yüzü gerekir',
+    'Magic Loft: a guide must be an open curve (%s)':
+        'Sihirli Loft: rehber açık bir eğri olmalı (%s)',
+    'Magic Loft: guide %d is %.3f mm away from profile %d':
+        'Sihirli Loft: rehber %d, profil %d kesitinden %.3f mm uzakta',
+    'Magic Loft: the surface failed (%s)':
+        'Sihirli Loft: yüzey kurulamadı (%s)',
+    'Magic Loft: the surface gave an invalid solid':
+        'Sihirli Loft: yüzey geçersiz bir katı verdi',
+    'Magic Loft: the boolean with the Body failed':
+        "Sihirli Loft: Body ile boolean başarısız",
+    "Magic Loft: can't use that selection (%s)":
+        'Sihirli Loft: bu seçim kullanılamıyor (%s)',
+    'Magic Loft: a corner-to-round transition: PartDesign Thickness may give no wall here. Cut the inside with a Magic Loft Cut instead.\n':
+        'Sihirli Loft: köşeliden yuvarlağa geçiş: PartDesign Thickness burada et vermeyebilir. İçini Sihirli Loft Oyma ile boşaltın.\n',
+    'Profiles':
+        'Profiller',
+    'Up':
+        'Yukarı',
+    'Down':
+        'Aşağı',
+    'Add selection':
+        'Seçimi ekle',
+    'Remove':
+        'Çıkar',
+    'Start / end constraints':
+        'Başlangıç / bitiş kısıtları',
+    'Start':
+        'Başlangıç',
+    'End':
+        'Bitiş',
+    'Free':
+        'Serbest',
+    'Normal to profile':
+        'Profile dik',
+    'Tangent to face':
+        'Yüzeye teğet',
+    'Tangent strength':
+        'Teğet gücü',
+    'Guides':
+        'Rehberler',
+    'Draw ready guides':
+        'Hazır rehber çiz',
+    'Automatic guides you edit on screen. The selected guides are kept but not used while this is on':
+        'Ekranda düzenlenen otomatik rehberler. Bu açıkken seçili rehberler saklanır ama kullanılmaz',
+    'Number of guides':
+        'Rehber sayısı',
+    'Changing the number rebuilds the automatic guides; edits on them are lost':
+        'Sayı değişince otomatik rehberler yeniden kurulur; üzerlerindeki düzenlemeler kaybolur',
+    'Show preview':
+        'Önizleme göster',
+    'Zebra':
+        'Zebra',
+    'Reflection stripes on the surface, to judge its quality. Shown when you release the mouse':
+        'Yüzey kalitesini görmek için yansıma çizgileri. Fare bırakılınca gösterilir',
+    'Fit tolerance':
+        'Oturtma toleransı',
+    'Largest deviation of the surface fit: smaller is more exact, larger has fewer control points':
+        'Yüzey oturtmasının en büyük sapması: küçük değer daha hassas, büyük değer daha az kontrol noktası',
     'Add point':
         'Nokta ekle',
     'Click a guide point in the 3D view and move it with the gizmo (arrows: along an axis, squares: in a plane, cube: free) or drag the point itself. The white end points belong to the profiles and stay put. Click the curve to pick a span: Add point puts the new point where you clicked.':

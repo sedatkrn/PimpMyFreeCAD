@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- New **Magic Loft / Magic Loft Cut** (also a standalone solid in the Part workbench, and in its own Body): a loft
+  through two or more closed profiles, including non-planar edge loops, with selected guides or automatic guides
+  edited on screen, Free / Normal / Tangent ends, connector points and a zebra display. The surface is a low-pole
+  B-spline built without OCCT sweeps: a recompute took 40-260 ms on the test shapes, a drag step about 6 ms, and
+  Thickness and STEP passed. Known limit: PartDesign Thickness gives no wall on a corner-to-round transition.
 - Rail Pipe / Rail Groove profiles can now be **closed edges**: a circular edge, or several edges that form a closed
   flat loop. Select them on a solid, a Binder or a free face (two loops give two profiles). An edge around a real face
   of a solid acts like that face (the pipe leaves outwards); a hole mouth also leaves outwards, without overlapping

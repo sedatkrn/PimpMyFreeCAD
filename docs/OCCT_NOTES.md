@@ -59,6 +59,34 @@ any sweep, boolean or interactive PartDesign tool in this repository.
   becomes one more solid: count that as a clean result, not as a split. Fusing every new pipe with the whole
   growing Body (plus refine and the volume check) took 8.6 / 10.6 / 20.5 s for pipes 2-4; now about 1-2 s.
 
+- **Fuzzy booleans for near-coincident ends.** A fitted loft end on a body edge is off by ~0.01 mm. `fuse(tool)` then took
+  500 ms and gave 20-32 faces, sometimes invalid; `fuse(tool, 1e-3)` took 40 ms, 4 faces after refine, valid, Thickness
+  OK, volume right. Pass the same tolerance to `common` in the volume check, which was as slow otherwise.
+
+## Thickness
+
+- **It can do nothing silently.** On a corner-to-round loft (hexagon to circle) `makeThickness` returns the input
+  unchanged at 1.5 mm and raises at 0.5 mm; PartDesign Thickness shows Up-to-date with no wall. Same with `makeLoft`
+  surfaces. Hexagon to hexagon works; an inner loft from inset profiles + cut works.
+- **`Shape.Volume` is unreliable on its result** (`GeomOffsetSurface`): 10925..13098 for one geometry, while the volume of
+  `tessellate()` gave 12913..12920. Compare tessellated volumes.
+
+## Direct lofts (Magic Loft)
+
+- A surface computed with numpy and fitted to one cubic B-spline (`buildFromPolesMultsKnots`) beat `makeLoft` where it
+  matters here: valid on a non-planar section where `makeLoft` was invalid, 24-48 x 8-13 poles whatever the profile's
+  own pole count (`makeLoft` gave 867 x 2 for a 72-point spline, but 15 x 2 for a true ellipse), about 10 ms.
+- Check the fit in **both** directions. A fixed 12 rows along the loft left the surface 0.50 mm off a guide with a 0.02 mm
+  tolerance (user test file, guides with a tight end). Growing the rows until the error is under the tolerance gave 27
+  rows and 0.004 mm, still about 40 ms.
+- A piecewise-linear parameter map leaves a speed kink the fit can never absorb: the pole count hit its cap (128) at
+  every tolerance. A smooth map through the same keys needed 96 at 0.02 mm and 48 at 0.1 mm.
+- A periodic surface's basis is easiest to get right by probing: build a curve with one unit pole and read its values.
+- An end tangent must be applied at the real end. An overlap span along the section normal bent the surface away from
+  the adjacent face (29 degrees on a cone); without the span the normals matched to 0.00.
+- `Part.Solid` from `Part.Shell([surfaces, caps])` after `sewShape()` works when the caps are built from the surface's
+  own `vIso` edges.
+
 ## PartDesign Python features
 
 - `PartDesign::FeatureAdditivePython` / `FeatureSubtractivePython`: read `BaseFeature.Shape`, set `AddSubShape`

@@ -88,6 +88,69 @@ class _RailPipe:
         Gui.Selection.addSelection(new)
 
 
+class _MagicLoft:
+    """Magic Loft (ekler) / Magic Loft Cut (oyar): secili kapali kesitler arasinda temiz yuzey; acik sketch / egriler
+    rehber olur (pda_magicloft). Gorev paneli hemen acilir: sira, uc kisitlari, rehberler."""
+
+    def __init__(self, subtractive):
+        self.sub = subtractive
+
+    def GetResources(self):
+        if self.sub:
+            return {"Pixmap": os.path.join(ICONS, "pda_magicloftcut.svg"), "MenuText": T("Magic Loft Cut"),
+                    "ToolTip": T("PartDesign: cut a loft through two or more closed profiles, with selected or "
+                                 "automatic guides")}
+        return {"Pixmap": os.path.join(ICONS, "pda_magicloft.svg"), "MenuText": T("Magic Loft"),
+                "ToolTip": T("PartDesign: add a clean loft through two or more closed profiles (also 3D edge loops), "
+                             "with selected or automatic guides. Open curves in the selection become guides")}
+
+    def IsActive(self):
+        return App.ActiveDocument is not None
+
+    def Activated(self):
+        import pda_magicloft
+        prof, guides = pda_magicloft.classify(Gui.Selection.getSelectionEx())
+        if len(prof) < 2:
+            App.Console.PrintWarning(T("Magic Loft: select at least two closed profiles (flat faces, closed edge "
+                                       "loops or closed sketches); open curves become guides.\n"))
+            return
+        doc = prof[0][0].Document
+        part = not self.sub and _workbench() == "PartWorkbench"
+        own = not self.sub and not part and own_body()
+        body = None
+        if not (part or own):
+            items = prof + guides
+            bodies = [p[0].getParentGeoFeatureGroup() for p in items]
+            body = bodies[0]
+            if any(b is None or b.TypeId != "PartDesign::Body" or b is not body for b in bodies):
+                if self.sub:
+                    App.Console.PrintWarning(T("Magic Loft: the profiles must belong to a PartDesign Body.\n"))
+                    return
+                own = True
+        doc.openTransaction(T("Magic Loft Cut") if self.sub else T("Magic Loft"))
+        if part:
+            new = pda_magicloft.make_part(doc, prof, guides)
+        elif own:
+            new = pda_magicloft.make_own_body(doc, prof, guides)
+        else:
+            new = pda_magicloft.make(body, prof, guides, self.sub)
+        if isinstance(new, str):
+            doc.abortTransaction()
+            App.Console.PrintWarning(T(new) + "\n")
+            return
+        doc.recompute()
+        doc.commitTransaction()
+        for p in prof + guides:                            # PartDesign gibi: kullanilan sketch'ler gizlenir
+            if not p[1] and hasattr(p[0], "ViewObject") and p[0].ViewObject is not None:
+                p[0].ViewObject.Visibility = False
+        if getattr(new, "BaseFeature", None) is not None and "Invalid" not in new.State:
+            new.BaseFeature.ViewObject.Visibility = False
+            new.ViewObject.Visibility = True
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(new)
+        Gui.ActiveDocument.setEdit(new, 0)
+
+
 def _edge_profiles(so):
     """Secili kenarlardan profiller: her kapali halka bir profil, (nesne, ["EdgeN", ...]). Kapanmayan kenarlar
     (kare halkanin tek bir kenari gibi) profil olmaz."""
@@ -136,9 +199,11 @@ class _OwnBody:
         set_own_body(bool(checked) if checked is not None else not own_body())
 
 
-COMMANDS = ["PDA_RailPipe", "PDA_RailGroove"]
+COMMANDS = ["PDA_RailPipe", "PDA_RailGroove", "PDA_MagicLoft", "PDA_MagicLoftCut"]
 OPTIONS = ["PDA_RailPipeOwnBody"]
 
 Gui.addCommand("PDA_RailPipe", _RailPipe(False))
 Gui.addCommand("PDA_RailGroove", _RailPipe(True))
+Gui.addCommand("PDA_MagicLoft", _MagicLoft(False))
+Gui.addCommand("PDA_MagicLoftCut", _MagicLoft(True))
 Gui.addCommand("PDA_RailPipeOwnBody", _OwnBody())

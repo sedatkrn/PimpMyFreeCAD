@@ -8,7 +8,7 @@ import FreeCADGui as Gui
 
 class PimpMyPartDesignWorkbench(Gui.Workbench):
     MenuText = "Pimp My PartDesign"
-    ToolTip = "Extra PartDesign features: Rail Pipe / Rail Groove along an editable guide curve"
+    ToolTip = "Extra PartDesign features: Rail Pipe / Rail Groove along an editable guide curve, Magic Loft"
 
     def __init__(self):
         import pda_commands
@@ -44,7 +44,7 @@ class _PartDesignTools:
             return [{"append": c, "toolBar": "Part Design Modeling Features"}
                     for c in pda_commands.COMMANDS + pda_commands.OPTIONS]
         if wb == "PartWorkbench":                          # ("insert" + "toolItem": Part_Sweep yerlesmiyordu)
-            return [{"append": "PDA_RailPipe", "toolBar": "Part Tools"}]
+            return [{"append": c, "toolBar": "Part Tools"} for c in ("PDA_RailPipe", "PDA_MagicLoft")]
         return []
 
 
@@ -60,6 +60,10 @@ class _RestoreObserver:
             if n:
                 App.Console.PrintMessage("Pimp My PartDesign: %d Rail Pipe / Groove object(s) linked to this add-in "
                                          "in %s (save the document to keep it)\n" % (n, doc.Name))
+        if any("AutoGuideOffsets" in o.PropertiesList and type(getattr(o, "Proxy", None)).__module__ != "pda_magicloft"
+               for o in doc.Objects):
+            import pda_magicloft
+            pda_magicloft.repair_proxies(doc)
 
 
 import FreeCAD as App

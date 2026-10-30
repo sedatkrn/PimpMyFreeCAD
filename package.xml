@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
   <name>Pimp My PartDesign</name>
-  <description>Extra PartDesign features. Rail Pipe / Rail Groove: sweep a flat face or closed sketch along a guide curve to a second profile or a free end, added to or cut out of the Body; edit the guide on screen with a Move gizmo, cable-like neighbours and the native PartDesign preview.</description>
+  <description>Extra PartDesign features. Rail Pipe / Rail Groove: sweep a flat face or closed sketch along a guide curve to a second profile or a free end, added to or cut out of the Body; edit the guide on screen with a Move gizmo, cable-like neighbours and the native PartDesign preview. Magic Loft / Magic Loft Cut: a clean loft through closed profiles with selected or automatic guides.</description>
   <version>0.1.0</version>
   <date>2026-10-29</date>
   <maintainer email="sedatkuran@gmail.com">sedatkrn</maintainer>

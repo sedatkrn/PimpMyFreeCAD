@@ -42,6 +42,30 @@ Sweeps a profile along a guide curve and adds it to the Body (**Rail Pipe**) or 
 Limits of this first version: the profile is the start face's / sketch's outer outline (holes are ignored), no
 scale per guide point yet.
 
+## Magic Loft / Magic Loft Cut
+
+A clean loft through two or more closed profiles, added to the Body (**Magic Loft**) or cut out (**Magic Loft Cut**).
+It builds one low-pole surface instead of a dense sweep: fast, and made to take PartDesign Thickness and export to STEP.
+
+- **Profiles:** select flat faces, closed sketches, Binders or closed edge loops; a loop may be **non-planar** (a parting
+  line, for example). They are ordered automatically; *Up* / *Down* change the order. Seams and corners are matched
+  automatically. For a section in the middle, select one more profile.
+- **Guides:** open sketches or curves in the selection become guides, and each separate open chain in a sketch is one
+  guide. A guide must touch every profile, otherwise the feature reports which one is how far away. With
+  **Draw ready guides** on, automatic guides appear instead (4 by default, *Number of guides* changes it and rebuilds
+  them); the selected guides stay in the list, unused, until you switch it off.
+- **Start / end constraints:** *Free*, *Normal to profile* or *Tangent to face* per end, with a strength. An end on a
+  solid's face starts as Normal, a sketch end as Free.
+- **Edit on screen:** double-click the feature (the panel also opens right after creating one). Move the yellow points
+  of the automatic guides with the Move gizmo, add and delete points, use *Move neighbors*. Drag the green **connector**
+  dots to fix a twist (hidden with selected guides, which set the matching themselves). While dragging you see a
+  light mesh; on release the real surface; *Zebra* shows reflection stripes on it. The solid is computed on **OK**.
+- **Part workbench:** a standalone solid outside any Body. *Own Body* works as for Rail Pipe.
+
+Limits: a **corner-to-round** transition (hexagon to circle) gets no wall from PartDesign Thickness and no error from it;
+the feature warns about it. Cut the inside with a Magic Loft Cut from inset profiles instead. Close loft, a centerline,
+curvature (G2) ends and open profiles are not available.
+
 ## Installation
 
 **Addon Manager (custom repository)**
@@ -84,3 +108,9 @@ Profil, yüzlerden dik çıkan bir kılavuz eğri boyunca süpürülür ve Body'
 Özelliğe çift tıklayınca kılavuz ekranda düzenlenir: sarı noktayı gizmo ile ya da doğrudan sürükleyin, eğriye
 tıklayıp *Nokta ekle* ile tam tıkladığınız yere nokta koyun, *Komşular da gelsin* ile kılavuz kablo gibi gelir.
 Önizleme PartDesign'daki gibi yeşil / kırmızı yarı saydamdır. **Tamam** tek geri alma adımıdır, **İptal** geri alır.
+
+**Sihirli Loft (Magic Loft) / Sihirli Loft Oyma:** iki ya da daha fazla kapalı profil seçin (düz yüz, kapalı sketch,
+Binder, düzlemsel olmayabilen kapalı kenar halkası); seçimdeki açık eğriler rehber olur. *Hazır rehber çiz* açıkken
+otomatik rehberler oluşur ve ekranda düzenlenir, seçili rehberler saklanır ama kullanılmaz. Uçlar *Serbest*, *Profile
+dik* ya da *Yüzeye teğet* olabilir. Yeşil connector noktaları burulmayı düzeltir, *Zebra* yüzey kalitesini gösterir.
+Köşeliden yuvarlağa geçişte PartDesign Thickness et vermez; içini Sihirli Loft Oyma ile boşaltın.

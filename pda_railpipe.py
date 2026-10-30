@@ -262,8 +262,9 @@ def _volume_ok(base, tool, res, sub, rel=0.005):
         return False
 
 
-def _combine(base, tool, sub, refine):
-    """Boruyu govdeye ekle / govdeden oy: (sonuc, temiz mi) ya da gecersizse None. Boolean yalniz borunun kutusuna
+def _combine(base, tool, sub, refine, fuzzy=0.0):
+    """Boruyu govdeye ekle / govdeden oy: (sonuc, temiz mi) ya da gecersizse None. fuzzy > 0: boolean toleransi (Magic
+    Loft). Boolean yalniz borunun kutusuna
     giren katilarla yapilir, digerleri oldugu gibi kalir: ayni Body'de birbirine degmeyen her yeni boru butun
     govdeyle birlestirilip refine / hacim denetiminden geciyordu (motor-test: 4. boru 20 s). Temiz: hacim tutuyor
     ve hicbir kati bolunmedi (degmeyen yeni boru ayri kati olur, bu bolunme sayilmaz)."""
@@ -280,13 +281,16 @@ def _combine(base, tool, sub, refine):
         (near if hit else far).append(s)
     if near:
         part = near[0] if len(near) == 1 else Part.makeCompound(near)
-        r = part.cut(tool) if sub else part.fuse(tool)
+        if fuzzy > 0:
+            r = part.cut(tool, fuzzy) if sub else part.fuse(tool, fuzzy)
+        else:
+            r = part.cut(tool) if sub else part.fuse(tool)
         if refine:
             r = r.removeSplitter()
         if not r.isValid() or (not r.Solids and not sub):
             return None
         try:
-            common = part.common(tool).Volume
+            common = part.common(tool, fuzzy).Volume if fuzzy > 0 else part.common(tool).Volume
         except Exception:
             return None
         want = part.Volume - common if sub else part.Volume + tool.Volume - common

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- loft body between two sections -->
+  <path d="M8 50 C12 34 20 22 24 12 L46 12 C48 24 54 36 56 50 Z" fill="#7fa6dc"/>
+  <path d="M24 12 L33 12 C32 24 30 38 30 54 C20 54 10 53 8 50 C12 34 20 22 24 12 Z" fill="#3b6fb6" opacity="0.55"/>
+  <ellipse cx="32" cy="50" rx="24" ry="7" fill="#3b6fb6"/>
+  <ellipse cx="35" cy="12" rx="11" ry="4" fill="#c9daf3" stroke="#2b5490" stroke-width="1"/>
+  <!-- guide curves and connector -->
+  <path d="M8 50 C12 34 20 22 24 12" fill="none" stroke="#f5c518" stroke-width="2"/>
+  <path d="M56 50 C54 36 48 24 46 12" fill="none" stroke="#f5c518" stroke-width="2"/>
+  <circle cx="15" cy="31" r="2.8" fill="#f5c518"/>
+  <circle cx="51" cy="31" r="2.8" fill="#f5c518"/>
+  <circle cx="32" cy="57" r="3" fill="#2fc14b"/>
+  <circle cx="35" cy="16" r="3" fill="#2fc14b"/>
+</svg>
