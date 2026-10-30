@@ -33,18 +33,19 @@ class _RailPipe:
 
     def Activated(self):
         import pda_railpipe
-        prof = []                                          # (nesne, "FaceN") ya da sketch icin (sketch, None)
+        prof = []               # (nesne, "FaceN"), kapali kenarlar icin (nesne, ["EdgeN", ...]), sketch icin (sketch, None)
         for so in Gui.Selection.getSelectionEx():
             if pda_railpipe._is_sketch(so.Object):        # sketch: kenarina tiklanmis ya da agacta secili
                 if all(p[0] is not so.Object for p in prof):
                     prof.append((so.Object, None))
             elif so.SubElementNames:
                 prof += [(so.Object, sub) for sub in so.SubElementNames if sub.startswith("Face")]
+                prof += _edge_profiles(so)
             elif hasattr(so.Object, "Shape") and len(so.Object.Shape.Faces) == 1:
                 prof.append((so.Object, "Face1"))           # agacta secilen tek yuzlu nesne (or. Binder)
         if not 1 <= len(prof) <= 2:
-            App.Console.PrintWarning(T("Rail Pipe: select one or two flat faces or closed sketches of a "
-                                       "PartDesign Body.\n"))
+            App.Console.PrintWarning(T("Rail Pipe: select one or two flat faces, closed edges or closed "
+                                       "sketches of a PartDesign Body.\n"))
             return
         obj = prof[0][0]
         doc = obj.Document
@@ -53,10 +54,14 @@ class _RailPipe:
         part = not self.sub and _workbench() == "PartWorkbench"
         own = not self.sub and not part and own_body()
         if not (part or own):
-            body = obj.getParentGeoFeatureGroup() if hasattr(obj, "getParentGeoFeatureGroup") else None
-            if body is None or body.TypeId != "PartDesign::Body":
-                App.Console.PrintWarning(T("Rail Pipe: the faces must belong to a PartDesign Body.\n"))
-                return
+            bodies = [p[0].getParentGeoFeatureGroup() if hasattr(p[0], "getParentGeoFeatureGroup") else None
+                      for p in prof]
+            body = bodies[0]
+            if any(b is None or b.TypeId != "PartDesign::Body" or b is not body for b in bodies):
+                if self.sub:
+                    App.Console.PrintWarning(T("Rail Pipe: the faces must belong to a PartDesign Body.\n"))
+                    return
+                own = True                                 # profiller ayri nesnelerde: boru kendi Body'sinde
         doc.openTransaction(T("Rail Groove") if self.sub else T("Rail Pipe"))
         if part:
             new = pda_railpipe.make_part(doc, prof[0], end)
@@ -81,6 +86,18 @@ class _RailPipe:
             new.ViewObject.Visibility = True
         Gui.Selection.clearSelection()
         Gui.Selection.addSelection(new)
+
+
+def _edge_profiles(so):
+    """Secili kenarlardan profiller: her kapali halka bir profil, (nesne, ["EdgeN", ...]). Kapanmayan kenarlar
+    (kare halkanin tek bir kenari gibi) profil olmaz."""
+    import pda_railpipe
+    names = [s for s in so.SubElementNames if s.startswith("Edge")]
+    if not names:
+        return []
+    edges = {n: so.Object.Shape.getElement(n) for n in names}
+    return [(so.Object, [n for n, e in edges.items() if any(e.isSame(x) for x in w.Edges)])
+            for w in pda_railpipe.edge_loops(list(edges.values()))]
 
 
 def _workbench():

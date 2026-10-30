@@ -44,6 +44,53 @@ def _closed_wire(sh):
     return max(ws, key=lambda w: w.BoundBox.DiagonalLength) if ws else None
 
 
+def _subs(p):
+    """Profil (nesne, alt eleman) icin alt eleman listesi: None (sketch, tek yuzlu nesne), "FaceN" ya da kenar listesi."""
+    return [] if not p[1] else [p[1]] if isinstance(p[1], str) else list(p[1])
+
+
+def edge_loops(edges):
+    """Kenarlardan kapali teller: uc uca gelen kenarlar birlesir (dairenin kendisi tek basina kapalidir). Kapanmayan
+    zincirler atlanir."""
+    loops = []
+    for chain in Part.sortEdges(edges):
+        try:
+            w = Part.Wire(chain)
+        except Exception:
+            continue
+        if w.isClosed():
+            loops.append(w)
+    return loops
+
+
+def _edge_profile(sh, subs):
+    """Secili kapali kenar(lar)dan profil: (tel, merkez, normal, katinin yuzu mu) ya da hata metni. Tel yuze
+    donusturulur (duz olmali). Normal, katida kenarin degdigi ayni duzlemdeki yuzun disa bakan normali: kenar katinin
+    gercek bir yuzunu sinirliyorsa profil o yuz gibi davranir (boru disari cikar, uc govdeye tasar); delik agzi gibi
+    icinde malzeme olmayan kenarda yalniz yon bu normalden gelir."""
+    edges = [sh.getElement(s) for s in subs]
+    loops = edge_loops(edges)
+    if len(loops) != 1 or sum(len(w.Edges) for w in loops) != len(edges):
+        return "Rail Pipe: the selected edges must form one closed loop"
+    w = loops[0]
+    try:
+        pf = Part.Face(w)
+    except Exception:
+        return "Rail Pipe: the closed edges must lie in one plane"
+    if not (pf.isPlanar() if hasattr(pf, "isPlanar") else pf.Surface.TypeId == "Part::GeomPlane"):
+        return "Rail Pipe: the closed edges must lie in one plane"
+    c, n = face_frame(pf)
+    size = max(w.BoundBox.DiagonalLength, 1.0)
+    for f in sh.ancestorsOfType(edges[0], Part.Face):
+        if f.Surface.TypeId != "Part::GeomPlane":
+            continue
+        fc, fn = face_frame(f)
+        if abs(fn.dot(n)) < 1 - 1e-9 or abs((fc - c).dot(n)) > 1e-5 * size:
+            continue
+        return w, c, fn, f.isInside(c, 1e-6 * size, True) and bool(sh.Solids)
+    return w, c, n, False
+
+
 def profile(link, glob=False):
     """PropertyLinkSub'tan profil: (dis tel, merkez, normal, katinin yuzu mu) ya da None / hata metni. Katinin duz
     yuzu: normali disari bakar, boru oradan cikar. Sketch (alt eleman yok ya da kenar): en buyuk kapali teli, normali
@@ -62,6 +109,8 @@ def profile(link, glob=False):
     f = None
     try:
         sh = _shape(o, None, glob)
+        if subs and subs[0].startswith("Edge"):            # katinin / yuzun kapali kenari (daire, kenar halkasi)
+            return _edge_profile(sh, subs)
         if subs:
             f = _shape(o, subs[0], glob)
         elif len(sh.Faces) == 1:                           # agacta secilen tek yuzlu nesne (or. Binder)
@@ -71,6 +120,12 @@ def profile(link, glob=False):
             if w is not None:
                 pf = Part.Face(w)
                 return w, pf.CenterOfMass, pf.normalAt(0, 0), False
+            if sh.Edges:                                   # Binder'da gevsek kenarlar (daire): tele baglanir
+                ws = edge_loops(sh.Edges)
+                if ws:
+                    w = max(ws, key=lambda x: x.BoundBox.DiagonalLength)
+                    pf = Part.Face(w)
+                    return w, pf.CenterOfMass, pf.normalAt(0, 0), False
     except Exception:
         f = None
     if f is None or f.ShapeType != "Face":
@@ -338,7 +393,10 @@ def _directions(pa, pb, pts, sub, reversed_):
         ta = na * out
     else:
         to = pb[1] if pb is not None else (pts[0] if pts else ca + na)   # iki profilde obur profile dogru
-        ta = na if na.dot(to - ca) >= 0 else -na
+        d = na.dot(to - ca)
+        if abs(d) <= 1e-9 and pts:                         # yan yana (dik): egrinin gittigi yan
+            d = na.dot(pts[0] - ca)
+        ta = na if d >= -1e-9 else -na                     # nokta yoksa verilen normal: iki uc ayni yana kavis
         if reversed_:
             ta = -ta
     tb = None
@@ -348,7 +406,7 @@ def _directions(pa, pb, pts, sub, reversed_):
             tb = nb * -out                                 # B'ye disaridan (Groove: iceriden) girer
         else:
             frm = pts[-1] if pts else ca
-            tb = nb if nb.dot(cb - frm) >= 0 else -nb
+            tb = nb if nb.dot(cb - frm) > 1e-9 else -nb
     return ta, tb
 
 
@@ -794,10 +852,11 @@ def initial_points(pa, pb, subtractive, k=3):
     return pts
 
 
-def make(body, start, end=None, subtractive=False):
-    """Body'de yeni Rail Pipe / Rail Groove: start / end (nesne, "FaceN"), sketch icin (sketch, None); end None:
-    serbest uc. Nesneyi dondurur; profil kullanilamiyorsa hata metni (nesne olusturulmaz)."""
-    link = lambda p: (p[0], [p[1]] if p[1] else [])
+def make(body, start, end=None, subtractive=False, shape_from=None):
+    """Body'de yeni Rail Pipe / Rail Groove: start / end (nesne, "FaceN" ya da kapali kenar listesi), sketch icin (sketch, None); end None:
+    serbest uc. shape_from: ilk kilavuz egrisi icin (pa, pb); Binder'lar katinin disa bakan yonunu tasimaz. Nesneyi
+    dondurur; profil kullanilamiyorsa hata metni (nesne olusturulmaz)."""
+    link = lambda p: (p[0], _subs(p))
     pa = profile(link(start))
     pb = profile(link(end)) if end is not None else None
     for p in (pa, pb):
@@ -811,7 +870,7 @@ def make(body, start, end=None, subtractive=False):
     obj.StartFace = link(start)
     if end is not None:
         obj.EndFace = link(end)
-    obj.GuidePoints = initial_points(pa, pb, subtractive)
+    obj.GuidePoints = initial_points(*(shape_from or (pa, pb)), subtractive)
     if App.GuiUp:
         ViewProviderRailPipe(obj.ViewObject, None)
         _fine_display(obj)
@@ -827,9 +886,9 @@ def _fine_display(obj):
 
 def make_part(doc, start, end=None):
     """Part workbench: Body disinda, kendi basina Rail Pipe katisi (boolean yok; govdeye Part Fuse / Cut ile
-    eklenir). start / end: (nesne, "FaceN") ya da sketch icin (nesne, None); profiller herhangi bir nesnenin (baska
+    eklenir). start / end: (nesne, "FaceN" / kenar listesi) ya da sketch icin (nesne, None); profiller herhangi bir nesnenin (baska
     Body'lerin de) yuzleri olabilir, dunya koordinatinda okunur. Nesne ya da hata metni."""
-    link = lambda p: (p[0], [p[1]] if p[1] else [])
+    link = lambda p: (p[0], _subs(p))
     pa = profile(link(start), True)
     pb = profile(link(end), True) if end is not None else None
     for p in (pa, pb):
@@ -851,12 +910,12 @@ def make_own_body(doc, start, end=None):
     """PartDesign, kendi Body'sinde: yeni bir Body acilir, profiller ona SubShapeBinder olarak baglanir ve boru
     o Body'nin ilk katisi olur. Ayni Body'de birikmis borularin her degisiklikte yeniden hesaplanmasi ve boolean'i
     olmaz. Nesne ya da hata metni (o zaman hicbir sey olusturulmaz)."""
+    orig = []
     for p in (start, end):
-        if p is None:
-            continue
-        pr = profile((p[0], [p[1]] if p[1] else []), True)
+        pr = None if p is None else profile((p[0], _subs(p)), True)
         if isinstance(pr, str):
             return pr
+        orig.append(pr)
     body = doc.addObject("PartDesign::Body", "RailPipeBody")
     profs = []
     for p in (start, end):
@@ -864,12 +923,12 @@ def make_own_body(doc, start, end=None):
             profs.append(None)
             continue
         b = body.newObject("PartDesign::SubShapeBinder", "RailPipeProfile")
-        b.Support = [(p[0], (p[1],) if p[1] else ("",))]
+        b.Support = [(p[0], tuple(_subs(p)) or ("",))]
         b.recompute()
         if App.GuiUp:
             b.ViewObject.Visibility = False
         profs.append((b, None))
-    obj = make(body, profs[0], profs[1])
+    obj = make(body, profs[0], profs[1], shape_from=orig)
     if isinstance(obj, str):
         for o in list(body.Group):
             doc.removeObject(o.Name)

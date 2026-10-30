@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Rail Pipe / Rail Groove profiles can now be **closed edges**: a circular edge, or several edges that form a closed
+  flat loop. Select them on a solid, a Binder or a free face (two loops give two profiles). An edge around a real face
+  of a solid acts like that face (the pipe leaves outwards); a hole mouth also leaves outwards, without overlapping
+  the hole. In PartDesign, a Rail Pipe whose profiles are on different Bodies or outside a Body gets its own Body.
 - **Shell** option for Rail Pipe (task panel *Options*: *Shell* + *Wall thickness*; properties Shell /
   WallThickness): a hollow pipe with open ends. The end profiles are inset by the wall thickness, swept the same
   way along the same guide and cut from the outer pipe, so it doesn't depend on FreeCAD's Thickness (OCCT offset),

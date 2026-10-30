@@ -11,7 +11,8 @@ Requires **FreeCAD 1.0 or newer** (developed on 26.3). No extra Python packages.
 
 Sweeps a profile along a guide curve and adds it to the Body (**Rail Pipe**) or cuts it out (**Rail Groove**).
 
-- **Profiles:** select one or two **flat faces** of the Body or **closed sketches** (click a sketch edge or pick the
+- **Profiles:** select one or two **flat faces**, **closed edges** (a circular edge or a closed flat loop) or
+  **closed sketches** (click a sketch edge or pick the
   sketch in the tree). Two profiles: the start profile blends into the end profile. One profile: the pipe ends
   free; *EndScale* sizes the free end. An empty Body works too (the pipe becomes its first solid).
 - **Guide curve:** leaves the start profile perpendicular and (with two profiles) enters the end profile

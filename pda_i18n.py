@@ -89,8 +89,12 @@ TR = {
         'Raylı boru',
     'Rail Pipe: a free end needs at least one guide point':
         'Raylı boru: serbest uç için en az bir kılavuz noktası gerekir',
-    'Rail Pipe: select one or two flat faces or closed sketches of a PartDesign Body.\n':
-        "Raylı boru: bir PartDesign Body'nin bir ya da iki düz yüzünü veya kapalı sketch'ini seçin.\n",
+    'Rail Pipe: select one or two flat faces, closed edges or closed sketches of a PartDesign Body.\n':
+        "Raylı boru: bir PartDesign Body'nin bir ya da iki düz yüzünü, kapalı kenarını veya kapalı sketch'ini seçin.\n",
+    'Rail Pipe: the selected edges must form one closed loop':
+        'Raylı boru: seçili kenarlar tek bir kapalı halka oluşturmalı',
+    'Rail Pipe: the closed edges must lie in one plane':
+        'Raylı boru: kapalı kenarlar tek bir düzlemde olmalı',
     'Rail Pipe: the faces must belong to a PartDesign Body.\n':
         "Raylı boru: yüzler bir PartDesign Body'ye ait olmalı.\n",
     'Rail Pipe: the first sweep failed; adjust GuidePoints in the property view.\n':
