@@ -104,7 +104,7 @@ Limits:
 
 **Addon Manager (custom repository)**
 1. *Tools → Addon manager → ⚙ (settings) → Custom repositories*, add
-   `https://github.com/sedatkrn/pimp_my_partdesign` with branch `main`.
+   `https://github.com/sedatkrn/PimpMyFreeCAD` with branch `main`.
 2. Find **Pimp My FreeCAD**, install, restart FreeCAD.
 
 **Manual:** clone or unzip this repository into FreeCAD's user `Mod` folder and restart FreeCAD:

@@ -6,8 +6,8 @@
   <date>2026-10-29</date>
   <maintainer email="sedatkuran@gmail.com">sedatkrn</maintainer>
   <license file="LICENSE">MIT</license>
-  <url type="repository" branch="main">https://github.com/sedatkrn/pimp_my_partdesign</url>
-  <url type="readme">https://github.com/sedatkrn/pimp_my_partdesign/blob/main/README.md</url>
+  <url type="repository" branch="main">https://github.com/sedatkrn/PimpMyFreeCAD</url>
+  <url type="readme">https://github.com/sedatkrn/PimpMyFreeCAD/blob/main/README.md</url>
   <icon>icons/pda_addins.svg</icon>
   <freecadmin>1.0.0</freecadmin>
   <tag>partdesign</tag>
