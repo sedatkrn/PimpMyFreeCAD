@@ -45,6 +45,10 @@ class Panel(object):
         self.rev = QtWidgets.QCheckBox(T("Reversed (cut into the solid)"))
         self.rev.setChecked(bool(obj.Reversed))
         lay.addRow(self.rev)
+        self.ell = QtWidgets.QCheckBox(T("Tangent to steep walls (bullet shape)"))
+        self.ell.setToolTip(T("Off: a smooth bump with a free slope at steep walls"))
+        self.ell.setChecked(bool(obj.Elliptical))
+        lay.addRow(self.ell)
         self.status = QtWidgets.QLabel()
         self.status.setWordWrap(True)
         lay.addRow(self.status)
@@ -54,11 +58,13 @@ class Panel(object):
         self.timer.timeout.connect(self.apply)
         self.height.valueChanged.connect(lambda v: self.timer.start())
         self.rev.toggled.connect(lambda v: self.timer.start())
+        self.ell.toggled.connect(lambda v: self.timer.start())
         self.show_status()
 
     def apply(self):
         self.obj.Height = self.height.value()
         self.obj.Reversed = self.rev.isChecked()
+        self.obj.Elliptical = self.ell.isChecked()
         self.doc.recompute()
         self.show_status()
 
@@ -69,8 +75,7 @@ class Panel(object):
             return
         lines = [T("Tangent error at the edges: %.3f degrees") % float(o.TangentError)]
         if o.SteepEdges:
-            lines.append(T("%d edge(s) next to a steep wall: a dome can't start tangent there. Fillet the edge for a "
-                           "smooth run") % o.SteepEdges)
+            lines.append(T("%d edge(s) next to a steep wall are not tangent") % o.SteepEdges)
         self.status.setText("\n".join(lines))
 
     def getStandardButtons(self):

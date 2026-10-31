@@ -73,27 +73,30 @@ curvature (G2) ends and open profiles are not available.
 ## Dome
 
 Raises a flat face into a cap that runs tangent into the faces around it, like the Dome command in other CAD systems.
-Select one flat face of a Body and press **Dome**. The panel has *Height* and *Reversed* (cut into the solid), and the
-real solid updates as you change them. **OK** keeps it as one undo step; **Cancel** reverts it and removes a new feature.
+Select one flat face of a Body and press **Dome**. The panel has *Height*, *Reversed* (cut into the solid) and *Tangent to
+steep walls*, and the real solid updates as you change them. **OK** keeps it as one undo step; **Cancel** reverts it and
+removes a new feature. The panel shows the measured tangent error.
 
-- **Tangent edges:** the surface starts at the angle of the neighbouring face, so fillet the top edges first for a smooth
-  run. A filleted top has a horizontal neighbour, so the surface starts flat and rises in a gentle S, which is what
-  tangency requires. The panel shows the measured error (under 0.01 degrees on filleted tops).
-- **Outlines:** curved, concave and sharp-cornered outlines and faces with holes work. The dome returns to the face level
-  at every hole.
+- **Vertical walls all around** (a plain Pad top, a cylinder end): the dome starts tangent to the walls and rises along a
+  quarter ellipse, like a bullet. The surface is exact (0 degrees, exact height). Sharp corners run up to the top as ridges.
+  It needs an outline fully visible from its centre and no holes. With *Tangent to steep walls* off you get a smooth bump
+  instead, with a free slope at the walls.
+- **Filleted top edges:** the neighbour is horizontal, so the surface starts flat and rises in a gentle S (under 0.01
+  degrees). Curved, concave and sharp-cornered outlines and faces with holes work; the dome returns to the face level at
+  every hole.
 
 Limits:
-- **Steep walls:** next to a wall steeper than 60 degrees (a plain Pad top, for example) the dome cannot start tangent. The
-  edge stays sharp and the panel counts it.
+- **Mixed edges and holes next to steep walls:** when only some neighbours are steep, or the face has a hole, those edges
+  are not tangent. The edge stays sharp and the panel counts it.
+- **Drafted walls:** the bullet shape starts straight up, so it is off by the draft angle (5.7 degrees on a 5.7 degree wall).
 - **Slanted neighbours and low domes:** a chamfer needs enough height. A 45 degree chamfer on an 80 x 50 top is 29 degrees
-  off at 4 mm and 3 degrees off at 15 mm, and sharp corners stay flat-started.
-- **Curved edges:** the edge between the dome and its neighbour can fail OCCT's strict BOP check on curved outlines,
-  although the solid is valid and exports to STEP. A later fillet or boss across such a rim on an unfilleted part can
-  fail; check it. Booleans away from the rim worked in every test.
-- **Collisions:** a dome that runs into another part of the solid falls back to a real boolean, which takes seconds.
-- **Reversed:** always starts flat, whatever the neighbour.
-- **Thickness:** PartDesign Thickness left the part unchanged on a test part with a curved outline. It worked on the
-  rounded rectangle.
+  off at 4 mm and 3 degrees off at 15 mm.
+- **Filleted curved edges:** the edge between the dome and its neighbour can fail OCCT's strict BOP check, although the solid
+  is valid and exports to STEP. Booleans away from the rim worked in every test.
+- **Thickness:** PartDesign Thickness works on smooth outlines. It failed or left the part unchanged on outlines with sharp
+  corners.
+- **Collisions:** a smooth bump that runs into another part of the solid falls back to a real boolean, which takes seconds.
+- **Not available:** a peak moved off-centre with a point, and domes on curved faces.
 
 ## Installation
 
@@ -145,5 +148,5 @@ dik* ya da *Yüzeye teğet* olabilir. Yeşil connector noktaları burulmayı dü
 Köşeliden yuvarlağa geçişte PartDesign Thickness et vermez; içini Sihirli Loft Oyma ile boşaltın.
 
 **Kubbe (Dome):** bir Body'nin düz yüzünü seçip düğmeye basın, *Yükseklik* verin; yüz, kenarlarda komşu yüzlere teğet bir
-kubbeye dönüşür, *Ters* katının içine oyar. Düzgün geçiş için üst kenarları önce yuvarlayın: 60 dereceden dik duvarın
-yanında kubbe teğet başlayamaz, panel bu kenarları sayar. İç bükey çizgi, keskin köşe ve delikli yüz çalışır.
+kubbeye dönüşür, *Ters* katının içine oyar. Dört yanı dik duvarsa kubbe duvarlara teğet başlar (mermi biçimi), keskin
+köşeler tepeye sırt olarak gider. Fillet'li kenarda düz başlar; iç bükey çizgi ve delikli yüz de çalışır.

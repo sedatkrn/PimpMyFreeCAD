@@ -160,7 +160,7 @@ class _Dome:
     def GetResources(self):
         return {"Pixmap": os.path.join(ICONS, "pda_dome.svg"), "MenuText": T("Dome"),
                 "ToolTip": T("PartDesign: raise a flat face into a dome that meets its edges tangent to the neighbouring "
-                             "faces. Round the edges first: next to a vertical wall it can't start tangent")}
+                             "faces, filleted edges and vertical walls alike")}
 
     def IsActive(self):
         return App.ActiveDocument is not None

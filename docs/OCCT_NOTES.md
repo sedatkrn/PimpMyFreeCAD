@@ -125,3 +125,7 @@ unsaved work can be lost. `doc.saveCopy(path)` gets a user's geometry out withou
 - `surface.parameter(p)` on a 43 x 43 pole B-spline costs about 30 ms. When u, v are plane coordinates, compute them directly.
 - GeomPlate (`MakeFilling`) with G1 supports: 0.04 degrees on a rounded rectangle, but the fuse gave two solids there, and
   holes and concave outlines gave invalid solids or gaps of 0.03-0.6 mm.
+- A dome tangent to vertical walls cannot be a height field. Scaling the edge curve toward the centre along a quarter ellipse
+  is an exact NURBS (arc poles times curve poles, weights multiplied), and its fuse is clean. Build it from
+  `curve.toBSpline(a, b)` per quarter: a whole circle as one patch has parametric C0 knots, and the STEP volume came back
+  46-120 mm3 off. `BSplineCurve.segment` raised an error on those knots.

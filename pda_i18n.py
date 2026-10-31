@@ -53,8 +53,8 @@ TR = {
         'Yükseklik',
     'Reversed (cut into the solid)':
         'Ters (katının içine oyar)',
-    'PartDesign: raise a flat face into a dome that meets its edges tangent to the neighbouring faces. Round the edges first: next to a vertical wall it can\'t start tangent':
-        'PartDesign: düz bir yüzü, kenarlarda komşu yüzlere teğet bir kubbeye dönüştürür. Önce kenarları yuvarlayın: dik duvarın yanında teğet başlayamaz',
+    'PartDesign: raise a flat face into a dome that meets its edges tangent to the neighbouring faces, filleted edges and vertical walls alike':
+        'PartDesign: düz bir yüzü, kenarlarda komşu yüzlere teğet bir kubbeye dönüştürür; fillet\'li kenarda da dik duvarda da',
     'Dome: select one flat face of a PartDesign Body.\n':
         "Kubbe: bir PartDesign Body'nin tek bir düz yüzünü seçin.\n",
     'Dome: the face is missing':
@@ -75,8 +75,12 @@ TR = {
         'Kubbe: kubbe katının başka bir yerine giriyor; yüksekliği azaltın',
     'Tangent error at the edges: %.3f degrees':
         'Kenarlarda teğet hatası: %.3f derece',
-    "%d edge(s) next to a steep wall: a dome can't start tangent there. Fillet the edge for a smooth run":
-        '%d kenar dik duvarın yanında: kubbe orada teğet başlayamaz. Düzgün geçiş için kenarı yuvarlayın',
+    '%d edge(s) next to a steep wall are not tangent':
+        '%d kenar dik duvarın yanında ve teğet değil',
+    'Tangent to steep walls (bullet shape)':
+        'Dik duvarlara teğet (mermi biçimi)',
+    'Off: a smooth bump with a free slope at steep walls':
+        'Kapalıyken: dik duvarlarda eğimi serbest, yumuşak bir tümsek',
     'Magic Loft':
         'Sihirli Loft',
     'Magic Loft Cut':

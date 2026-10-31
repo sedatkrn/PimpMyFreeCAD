@@ -7,6 +7,8 @@
 # boslugu 3e-6 mm, 0.3 s; GeomPlate 0.04 derece ama delikte ve ic bukeyde gecersiz kati ya da 0.03..0.6 mm bosluk verdi.
 # Teget kubbe kenarda sifira inen ince bir dilimdir, boolean bozuluyordu (0 kati, gecersiz sonuc): yuz katinin icinde
 # dogrudan degistirilir. Boolean yalniz kubbe katinin baska bir yerine degiyorsa denenir.
+# Butun komsular dikse (Elliptical) yukseklik alani yetmez, egim sonsuza gider: kenar merkeze dogru kuculurken ceyrek elips
+# boyunca yukselir (ellipse_patches). Tam NURBS, duvara teget hatasi 0; burada boolean sorunsuz.
 import numpy as np
 
 import FreeCAD as App
@@ -300,6 +302,98 @@ def frame_normal(face):
     return face.normalAt((u0 + u1) / 2, (v0 + v1) / 2)
 
 
+def can_ellipse(face, shape):
+    """Dik duvarli kubbe olur mu: tek dis cizgi, merkezden her kenar noktasi gorunur, butun komsular dik. Merkez (yuzun
+    agirlik merkezi) ya da hata degil None."""
+    if len(face.Wires) != 1:
+        return None
+    n = frame_normal(face)
+    n.normalize()
+    c = face.CenterOfGravity
+    turn = []
+    for e in face.Edges:
+        f = neighbour(shape, e, face)
+        if f is None:
+            return None
+        for t in np.linspace(e.FirstParameter, e.LastParameter, 21):
+            p = e.valueAt(float(t))
+            m = f.normalAt(*f.Surface.parameter(p))
+            if abs(m.dot(n)) / m.Length > np.cos(np.radians(FREE_DEG)):
+                return None
+            turn.append(((p - c).cross(e.tangentAt(float(t))).dot(n)) * (-1.0 if e.Orientation == "Reversed" else 1.0))
+    turn = np.array(turn)
+    # merkezden bakinca kenar hep ayni yone donmeli; duz kenar merkezden geciyorsa 0 olur, o da olmaz
+    size = face.BoundBox.DiagonalLength
+    return c if (turn > 1e-6 * size).all() or (turn < -1e-6 * size).all() else None
+
+
+def ellipse_patches(face, center, height, sign):
+    """Her kenar icin bir yama: kenar egrisi merkeze dogru kuculurken ceyrek elips boyunca yukselir. Yay ve egri carpimi
+    tam NURBS: sinir kenarin kendisi, duvardaki teget tam yuzey normali yonunde. Yamalar tepede tek noktada bulusur;
+    keskin kose tepeye kadar sirt olarak gider."""
+    n = frame_normal(face)
+    n.normalize()
+    arc = ((1.0, 0.0, 1.0), (1.0, 1.0, np.sqrt(0.5)), (0.0, 1.0, 1.0))  # (olcek, yukseklik, agirlik)
+    out = []
+    for e in face.Edges:
+        for cv in _smooth_spans(e):
+            P, W = cv.getPoles(), cv.getWeights()
+            poles = [[center + (p - center) * s + n * (sign * height * z) for p in P] for s, z, _ in arc]
+            weights = [[w * float(a) for w in W] for _, _, a in arc]
+            s = Part.BSplineSurface()
+            s.buildFromPolesMultsKnots(poles, [3, 3], cv.getMultiplicities(), [0.0, 1.0], cv.getKnots(), False, False,
+                                       2, cv.Degree, weights)
+            out.append((e, s))
+    return out
+
+
+def _smooth_spans(edge):
+    """Kenarin NURBS'u, parametrik C0 dugumlerinde bolunmus. Daire / elips bu dugumlerle gelir: tek yamada BOP C0 hatasi
+    verdi ve STEP'ten donen hacim 46..120 mm3 saptı."""
+    a, b, cv = edge.FirstParameter, edge.LastParameter, edge.Curve
+    if cv.TypeId in ("Part::GeomCircle", "Part::GeomEllipse"):
+        cuts = list(np.linspace(a, b, int(np.ceil((b - a) / (np.pi / 2) - 1e-9)) + 1))   # parametre radyan: ceyrek basina tek aralik
+    elif cv.TypeId == "Part::GeomBSplineCurve":
+        inner = [k for k, m in zip(cv.getKnots(), cv.getMultiplicities()) if m >= cv.Degree and a + 1e-9 < k < b - 1e-9]
+        cuts = [a] + inner + [b]
+        if len(cuts) == 2 and edge.isClosed():             # kapali ama duzgun: dikis tek yamada kalmasin
+            cuts.insert(1, (a + b) / 2.0)
+    else:
+        cuts = [a, b]
+    out = []
+    for p, q in zip(cuts[:-1], cuts[1:]):
+        c = cv.toBSpline(float(p), float(q))
+        if c.isPeriodic():
+            c.setNotPeriodic()
+        out.append(c)
+    return out
+
+
+def ellipse_tool(face, patches):
+    shapes = [s.toShape() for _, s in patches]
+    rims = [Part.Edge(s.uIso(0.0)) for _, s in patches]
+    cap = Part.Face(Part.Wire(Part.__sortEdges__(rims)))   # kenarlar yamalarla ayni bolunmede
+    sh = Part.Shell(shapes + [cap])
+    sh.sewShape()
+    sol = Part.Solid(sh)
+    if sol.Volume < 0:
+        sol.reverse()
+    return sol
+
+
+def ellipse_error(face, shape, patches):
+    """Duvardaki en buyuk aci (derece): yama normali ile komsu yuz normali."""
+    worst = 0.0
+    for e, s in patches:
+        f = neighbour(shape, e, face)
+        v0, v1 = s.bounds()[2:]
+        for t in np.linspace(0.02, 0.98, 25):
+            q = s.value(0.0, v0 + (v1 - v0) * float(t))
+            a, b = s.normal(0.0, v0 + (v1 - v0) * float(t)), f.normalAt(*f.Surface.parameter(q))
+            worst = max(worst, np.degrees(np.arccos(min(1.0, abs(a.dot(b)) / (a.Length * b.Length)))))
+    return worst
+
+
 def read_face(link):
     """(nesne, yuz) ya da hata metni."""
     if not link or link[0] is None or not link[1]:
@@ -371,6 +465,13 @@ def collides(base, dome, face, sign, fld):
     return False
 
 
+def elliptical_prop(obj):
+    if "Elliptical" not in obj.PropertiesList:
+        obj.addProperty("App::PropertyBool", "Elliptical", "Dome",
+                        "Next to steep walls: start tangent to the walls (bullet shape). Off: a smooth bump with a free "
+                        "slope at the edges")
+
+
 class Dome:
     """Dome (FeatureAdditivePython). Reversed: kubbe yuzun altina, oyma."""
 
@@ -378,6 +479,8 @@ class Dome:
         obj.addProperty("App::PropertyLinkSub", "Face", "Dome", "Flat face to raise")
         obj.addProperty("App::PropertyLength", "Height", "Dome", "Height of the dome above the face").Height = 4.0
         obj.addProperty("App::PropertyBool", "Reversed", "Dome", "Dome into the solid (a cut) instead of out of it")
+        elliptical_prop(obj)
+        obj.Elliptical = True
         obj.addProperty("App::PropertyAngle", "TangentError", "Dome",
                         "Largest angle to the neighbouring faces along the edges it can be tangent to")
         obj.addProperty("App::PropertyInteger", "SteepEdges", "Dome",
@@ -387,6 +490,29 @@ class Dome:
         if "Refine" not in obj.PropertiesList:
             obj.addProperty("App::PropertyBool", "Refine", "Base", "Merge coplanar faces of the result")
         obj.Proxy = self
+
+    def ellipse(self, obj, base, face, center, height, sign):
+        """Dik duvara teget kubbe. Boolean olmaz, duz plaka yuzeyine donulur: False."""
+        try:
+            patches = ellipse_patches(face, center, height, sign)
+            tool = ellipse_tool(face, patches)
+            if not tool.isValid():
+                return False
+            res = None
+            for fuzzy in (1e-5, 1e-3):
+                r = rp._combine(base, tool, obj.Reversed, getattr(obj, "Refine", False), fuzzy)
+                if r is not None and r[1]:
+                    res = r[0]
+                    break
+        except Exception:
+            return False
+        if res is None:
+            return False
+        obj.TangentError = ellipse_error(face, base, patches)
+        obj.SteepEdges = 0
+        obj.AddSubShape = tool
+        obj.Shape = res
+        return True
 
     def field(self, obj, face, shape):
         """Ayni yuz icin cozum saklanir: Height ve surukleme 0.3 s yerine ~30 ms."""
@@ -415,6 +541,9 @@ class Dome:
         if height <= 0:
             raise RuntimeError(T("Dome: the height must be above zero"))
         sign = -1.0 if obj.Reversed else 1.0
+        center = can_ellipse(face, base) if obj.Elliptical else None
+        if center is not None and self.ellipse(obj, base, face, center, height, sign):
+            return
         # kopya: pcurve ve tolerans kenarlara yerinde yazilir, onceki adimin sekli bozulmasin (Rail Pipe'taki gibi)
         work = base.copy()
         wface = work.Faces[next(i for i, f in enumerate(base.Faces) if f.isSame(face))]
@@ -454,7 +583,7 @@ class Dome:
         obj.Shape = res
 
     def onDocumentRestored(self, obj):
-        pass
+        elliptical_prop(obj)
 
     def dumps(self):
         return None
