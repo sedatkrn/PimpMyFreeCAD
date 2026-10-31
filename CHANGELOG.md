@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Renamed to **Pimp My FreeCAD**, since the tools also work in the Part workbench. Saved documents and settings are not
+  affected: the `pda_` modules, command names, the workbench class and `Preferences/Mod/PimpMyPartDesign` keep their names.
+
 - New **Dome**: select a flat face, set a height, and the face rises into a cap that meets its edges tangent to the
   neighbouring faces; *Reversed* cuts it into the solid instead. On a filleted 80 x 50 top at 4 mm: tangent error 0.0004
   degrees, height 4.0003 mm, first computation 0.4 s, height change 0.1 s, valid STEP. Concave outlines and holes work.

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Pimp My PartDesign - application (non-GUI) start-up. Saved objects refer to the modules "pda_railpipe",
+# Pimp My FreeCAD - application (non-GUI) start-up. Saved objects refer to the modules "pda_railpipe",
 # "pda_magicloft" and "pda_dome", so documents must open (and recompute) without the GUI too.
 import FreeCAD
 
@@ -11,4 +11,4 @@ try:
     import pda_magicloft
     import pda_dome
 except Exception as e:
-    FreeCAD.Console.PrintWarning("Pimp My PartDesign: %s\n" % e)
+    FreeCAD.Console.PrintWarning("Pimp My FreeCAD: %s\n" % e)

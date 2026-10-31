@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Pimp My PartDesign - Rail Pipe / Rail Groove: kilavuz egriyi ekranda duzenleme. Copyright (c) 2026 Sedat Kuran -
+# Pimp My FreeCAD - Rail Pipe / Rail Groove: kilavuz egriyi ekranda duzenleme. Copyright (c) 2026 Sedat Kuran -
 # MIT License
 #
 # RailPipe'a cift tiklayinca (setEdit): kilavuz egri sari cizgi, noktalari tutamak (A / B uclari sabit, beyaz).

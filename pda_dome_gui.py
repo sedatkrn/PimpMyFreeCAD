@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Pimp My PartDesign - Dome: gorev paneli. Copyright (c) 2026 Sedat Kuran - MIT License
+# Pimp My FreeCAD - Dome: gorev paneli. Copyright (c) 2026 Sedat Kuran - MIT License
 #
 # Yukseklik degisince cozum yeniden kurulmaz (pda_dome.Field saklanir), gercek kati hemen gorunur: ayri onizleme yok.
 # OK degisiklikleri tek geri alma adimi olarak birakir, Cancel geri alir; yeni nesneyi de siler.

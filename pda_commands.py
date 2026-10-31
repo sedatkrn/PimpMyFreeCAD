@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Pimp My PartDesign - FreeCAD commands (toolbar / menu). Copyright (c) 2026 Sedat Kuran - MIT License
+# Pimp My FreeCAD - FreeCAD commands (toolbar / menu). Copyright (c) 2026 Sedat Kuran - MIT License
 import os
 
 import FreeCAD as App

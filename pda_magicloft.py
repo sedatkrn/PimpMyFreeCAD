@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Pimp My PartDesign - Magic Loft / Magic Loft Cut: PartDesign features (Body icinde Pad / Pocket gibi bir adim) ve Part
+# Pimp My FreeCAD - Magic Loft / Magic Loft Cut: PartDesign features (Body icinde Pad / Pocket gibi bir adim) ve Part
 # katisi. Copyright (c) 2026 Sedat Kuran - MIT License
 #
 # En az iki kapali kesit (duz yuz, kapali sketch, Binder, kapali kenar halkasi; halka duzlemsel olmak zorunda degil)

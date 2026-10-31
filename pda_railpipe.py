@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Pimp My PartDesign - Rail Pipe / Rail Groove: PartDesign features (Body icinde Pad / Pocket gibi bir adim).
+# Pimp My FreeCAD - Rail Pipe / Rail Groove: PartDesign features (Body icinde Pad / Pocket gibi bir adim).
 # Copyright (c) 2026 Sedat Kuran - MIT License
 #
 # FcSubDModelerWB'deki Rail bridge'in kesin B-rep karsiligi. Baslangic yuzu (A, duz) ile bitis yuzu (B) arasinda ya da A'dan

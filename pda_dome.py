@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Pimp My PartDesign - Dome: duz yuzun uzerinde, kenarlarda komsu yuzlere teget kubbe. Copyright (c) 2026 Sedat Kuran - MIT License
+# Pimp My FreeCAD - Dome: duz yuzun uzerinde, kenarlarda komsu yuzlere teget kubbe. Copyright (c) 2026 Sedat Kuran - MIT License
 #
 # Yuzey OCCT dolgusu (GeomPlate) degil: yuzun duzleminde yukseklik alani h(x, y), kubik B-spline uzayinda ince plaka
 # enerjisini en aza indirir (Ritz): kenarda h = 0 ve dh/dn = komsu yuzun egimi, yuk Height'i verecek kadar. Sonuc

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Pimp My PartDesign user interface language: English (default) or Turkish.
+"""Pimp My FreeCAD user interface language: English (default) or Turkish.
 
 UI strings are written in English in the code and wrapped with T(); when Turkish is selected T() looks them
 up in the TR table below (format placeholders such as %s / %.3f must stay the same).

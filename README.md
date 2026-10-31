@@ -1,9 +1,9 @@
-# Pimp My PartDesign
+# Pimp My FreeCAD
 
-Extra features for FreeCAD's **PartDesign** workbench. They are real PartDesign steps in a Body (like Pad or
-Pocket): they recompute with the Body, later steps (fillets, pockets) build on them and the result exports to
-STEP. The tools show up in PartDesign's own *Part Design Modeling Features* toolbar (next to Additive /
-Subtractive Pipe) and in a small *Pimp My PartDesign* workbench.
+Extra modeling tools for FreeCAD's **PartDesign** and **Part** workbenches. In a Body they are real PartDesign steps (like
+Pad or Pocket): they recompute with the Body, later steps (fillets, pockets) build on them and the result exports to STEP.
+Rail Pipe and Magic Loft also make standalone solids in the Part workbench. The tools show up in PartDesign's own
+*Part Design Modeling Features* toolbar (next to Additive / Subtractive Pipe) and in a small *Pimp My FreeCAD* workbench.
 
 Requires **FreeCAD 1.0 or newer** (developed on 26.3). No extra Python packages.
 
@@ -104,13 +104,13 @@ Limits:
 
 **Addon Manager (custom repository)**
 1. *Tools → Addon manager → ⚙ (settings) → Custom repositories*, add
-   `https://github.com/sedatkrn/partdesign_addins` with branch `main`.
-2. Find **Pimp My PartDesign**, install, restart FreeCAD.
+   `https://github.com/sedatkrn/pimp_my_partdesign` with branch `main`.
+2. Find **Pimp My FreeCAD**, install, restart FreeCAD.
 
 **Manual:** clone or unzip this repository into FreeCAD's user `Mod` folder and restart FreeCAD:
-- Windows: `%APPDATA%\FreeCAD\<version>\Mod\PimpMyPartDesign`
-- Linux: `~/.local/share/FreeCAD/<version>/Mod/PimpMyPartDesign`
-- macOS: `~/Library/Application Support/FreeCAD/<version>/Mod/PimpMyPartDesign`
+- Windows: `%APPDATA%\FreeCAD\<version>\Mod\PimpMyFreeCAD`
+- Linux: `~/.local/share/FreeCAD/<version>/Mod/PimpMyFreeCAD`
+- macOS: `~/Library/Application Support/FreeCAD/<version>/Mod/PimpMyFreeCAD`
 
 ## Language
 
@@ -133,8 +133,8 @@ documentation are in English.
 
 ### Türkçe
 
-FreeCAD **PartDesign** için ek özellikler. Body içinde Pad / Pocket gibi gerçek bir adım olarak çalışırlar;
-araçlar PartDesign'ın *Part Design Modeling Features* araç çubuğunda ve küçük bir *Pimp My PartDesign*
+FreeCAD **PartDesign** ve **Part** için ek araçlar. Body içinde Pad / Pocket gibi gerçek bir adım olarak çalışırlar;
+araçlar PartDesign'ın *Part Design Modeling Features* araç çubuğunda ve küçük bir *Pimp My FreeCAD*
 workbench'inde görünür.
 
 **Rail Pipe / Rail Groove:** bir ya da iki profil (Body'nin düz yüzü ya da kapalı sketch) seçip düğmeye basın.

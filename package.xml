@@ -1,27 +1,30 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no" ?>
 <package format="1" xmlns="https://wiki.freecad.org/Package_Metadata">
-  <name>Pimp My PartDesign</name>
-  <description>Extra PartDesign features. Rail Pipe / Rail Groove: sweep a flat face or closed sketch along a guide curve to a second profile or a free end, added to or cut out of the Body; edit the guide on screen with a Move gizmo, cable-like neighbours and the native PartDesign preview. Magic Loft / Magic Loft Cut: a clean loft through closed profiles with selected or automatic guides.</description>
+  <name>Pimp My FreeCAD</name>
+  <description>Extra modeling tools for PartDesign and Part. Rail Pipe / Rail Groove: sweep a flat face or closed sketch along a guide curve to a second profile or a free end, added to or cut out of the Body; edit the guide on screen with a Move gizmo, cable-like neighbours and the native PartDesign preview. Magic Loft / Magic Loft Cut: a clean loft through closed profiles with selected or automatic guides. Dome: raise a flat face into a cap tangent to its neighbouring faces.</description>
   <version>0.1.0</version>
   <date>2026-10-29</date>
   <maintainer email="sedatkuran@gmail.com">sedatkrn</maintainer>
   <license file="LICENSE">MIT</license>
-  <url type="repository" branch="main">https://github.com/sedatkrn/partdesign_addins</url>
-  <url type="readme">https://github.com/sedatkrn/partdesign_addins/blob/main/README.md</url>
+  <url type="repository" branch="main">https://github.com/sedatkrn/pimp_my_partdesign</url>
+  <url type="readme">https://github.com/sedatkrn/pimp_my_partdesign/blob/main/README.md</url>
   <icon>icons/pda_addins.svg</icon>
   <freecadmin>1.0.0</freecadmin>
   <tag>partdesign</tag>
+  <tag>part</tag>
+  <tag>loft</tag>
+  <tag>dome</tag>
   <tag>sweep</tag>
   <tag>pipe</tag>
   <tag>groove</tag>
   <tag>guide curve</tag>
   <content>
     <workbench>
-      <name>Pimp My PartDesign</name>
+      <name>Pimp My FreeCAD</name>
       <classname>PimpMyPartDesignWorkbench</classname>
       <icon>icons/pda_addins.svg</icon>
       <subdirectory>./</subdirectory>
-      <description>Rail Pipe / Rail Groove; the tools also appear in PartDesign's Modeling Features toolbar.</description>
+      <description>Rail Pipe / Rail Groove, Magic Loft, Dome; the tools also appear in the toolbars of PartDesign and Part.</description>
       <freecadmin>1.0.0</freecadmin>
     </workbench>
   </content>

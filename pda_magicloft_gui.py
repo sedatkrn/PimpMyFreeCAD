@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Pimp My PartDesign - Magic Loft: ekranda duzenleme ve gorev paneli. Copyright (c) 2026 Sedat Kuran - MIT License
+# Pimp My FreeCAD - Magic Loft: ekranda duzenleme ve gorev paneli. Copyright (c) 2026 Sedat Kuran - MIT License
 #
 # Magic Loft'a cift tiklayinca (setEdit): profil ve rehber listeleri, uc kisitlari, "Hazir rehber ciz". Otomatik
 # rehberler sari cizgi, noktalari tutamak (kesit noktalari sabit, beyaz; Ctrl+tik ile coklu secim); secili noktada Tasi
