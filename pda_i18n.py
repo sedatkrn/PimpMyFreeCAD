@@ -45,6 +45,38 @@ def T(text):
 
 
 TR = {
+    'Dome':
+        'Kubbe',
+    'Edit Dome':
+        'Kubbeyi düzenle',
+    'Height':
+        'Yükseklik',
+    'Reversed (cut into the solid)':
+        'Ters (katının içine oyar)',
+    'PartDesign: raise a flat face into a dome that meets its edges tangent to the neighbouring faces. Round the edges first: next to a vertical wall it can\'t start tangent':
+        'PartDesign: düz bir yüzü, kenarlarda komşu yüzlere teğet bir kubbeye dönüştürür. Önce kenarları yuvarlayın: dik duvarın yanında teğet başlayamaz',
+    'Dome: select one flat face of a PartDesign Body.\n':
+        "Kubbe: bir PartDesign Body'nin tek bir düz yüzünü seçin.\n",
+    'Dome: the face is missing':
+        'Kubbe: yüz bulunamadı',
+    'Dome: the face must be flat':
+        'Kubbe: yüz düz olmalı',
+    'Dome: the Body has no solid yet':
+        "Kubbe: Body'de henüz katı yok",
+    'Dome: the face is not on the previous solid; select it again on the last feature':
+        'Kubbe: yüz önceki katıda yok; son adımın üzerinde yeniden seçin',
+    'Dome: the height must be above zero':
+        'Kubbe: yükseklik sıfırdan büyük olmalı',
+    'Dome: the surface failed (%s)':
+        'Kubbe: yüzey kurulamadı (%s)',
+    'Dome: the outline has parts too narrow for the surface':
+        'Kubbe: dış çizgide yüzey için fazla dar bölgeler var',
+    'Dome: the dome runs into another part of the solid; lower the height':
+        'Kubbe: kubbe katının başka bir yerine giriyor; yüksekliği azaltın',
+    'Tangent error at the edges: %.3f degrees':
+        'Kenarlarda teğet hatası: %.3f derece',
+    "%d edge(s) next to a steep wall: a dome can't start tangent there. Fillet the edge for a smooth run":
+        '%d kenar dik duvarın yanında: kubbe orada teğet başlayamaz. Düzgün geçiş için kenarı yuvarlayın',
     'Magic Loft':
         'Sihirli Loft',
     'Magic Loft Cut':

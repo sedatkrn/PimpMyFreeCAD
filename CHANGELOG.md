@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- New **Dome**: select a flat face, set a height, and the face rises into a cap that meets its edges tangent to the
+  neighbouring faces; *Reversed* cuts it into the solid instead. On a filleted 80 x 50 top at 4 mm: tangent error 0.0004
+  degrees, height 4.0003 mm, first computation 0.4 s, height change 0.1 s, valid STEP. Concave outlines and holes work.
+  Next to a wall steeper than 60 degrees it cannot start tangent; the panel reports those edges.
 - New **Magic Loft / Magic Loft Cut** (also a standalone solid in the Part workbench, and in its own Body): a loft
   through two or more closed profiles, including non-planar edge loops, with selected guides or automatic guides
   edited on screen, Free / Normal / Tangent ends, connector points and a zebra display. The surface is a low-pole

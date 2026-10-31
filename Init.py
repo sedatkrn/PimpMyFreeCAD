@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-# Pimp My PartDesign - application (non-GUI) start-up. Saved objects refer to the modules "pda_railpipe" and
-# "pda_magicloft", so documents must open (and recompute) without the GUI too.
+# Pimp My PartDesign - application (non-GUI) start-up. Saved objects refer to the modules "pda_railpipe",
+# "pda_magicloft" and "pda_dome", so documents must open (and recompute) without the GUI too.
 import FreeCAD
 
 # FreeCAD 26.3+ belge acilirken yalniz Mod altindan bulunan modulleri aktarir. Klasor Mod'a baglanti (junction / symlink)
@@ -9,5 +9,6 @@ import FreeCAD
 try:
     import pda_railpipe
     import pda_magicloft
+    import pda_dome
 except Exception as e:
     FreeCAD.Console.PrintWarning("Pimp My PartDesign: %s\n" % e)

@@ -70,6 +70,31 @@ Limits: a **corner-to-round** transition (hexagon to circle) gets no wall from P
 the feature warns about it. Cut the inside with a Magic Loft Cut from inset profiles instead. Close loft, a centerline,
 curvature (G2) ends and open profiles are not available.
 
+## Dome
+
+Raises a flat face into a cap that runs tangent into the faces around it, like the Dome command in other CAD systems.
+Select one flat face of a Body and press **Dome**. The panel has *Height* and *Reversed* (cut into the solid), and the
+real solid updates as you change them. **OK** keeps it as one undo step; **Cancel** reverts it and removes a new feature.
+
+- **Tangent edges:** the surface starts at the angle of the neighbouring face, so fillet the top edges first for a smooth
+  run. A filleted top has a horizontal neighbour, so the surface starts flat and rises in a gentle S, which is what
+  tangency requires. The panel shows the measured error (under 0.01 degrees on filleted tops).
+- **Outlines:** curved, concave and sharp-cornered outlines and faces with holes work. The dome returns to the face level
+  at every hole.
+
+Limits:
+- **Steep walls:** next to a wall steeper than 60 degrees (a plain Pad top, for example) the dome cannot start tangent. The
+  edge stays sharp and the panel counts it.
+- **Slanted neighbours and low domes:** a chamfer needs enough height. A 45 degree chamfer on an 80 x 50 top is 29 degrees
+  off at 4 mm and 3 degrees off at 15 mm, and sharp corners stay flat-started.
+- **Curved edges:** the edge between the dome and its neighbour can fail OCCT's strict BOP check on curved outlines,
+  although the solid is valid and exports to STEP. A later fillet or boss across such a rim on an unfilleted part can
+  fail; check it. Booleans away from the rim worked in every test.
+- **Collisions:** a dome that runs into another part of the solid falls back to a real boolean, which takes seconds.
+- **Reversed:** always starts flat, whatever the neighbour.
+- **Thickness:** PartDesign Thickness left the part unchanged on a test part with a curved outline. It worked on the
+  rounded rectangle.
+
 ## Installation
 
 **Addon Manager (custom repository)**
@@ -118,3 +143,7 @@ Binder, düzlemsel olmayabilen kapalı kenar halkası); seçimdeki açık eğril
 otomatik rehberler oluşur ve ekranda düzenlenir, seçili rehberler saklanır ama kullanılmaz. Uçlar *Serbest*, *Profile
 dik* ya da *Yüzeye teğet* olabilir. Yeşil connector noktaları burulmayı düzeltir, *Zebra* yüzey kalitesini gösterir.
 Köşeliden yuvarlağa geçişte PartDesign Thickness et vermez; içini Sihirli Loft Oyma ile boşaltın.
+
+**Kubbe (Dome):** bir Body'nin düz yüzünü seçip düğmeye basın, *Yükseklik* verin; yüz, kenarlarda komşu yüzlere teğet bir
+kubbeye dönüşür, *Ters* katının içine oyar. Düzgün geçiş için üst kenarları önce yuvarlayın: 60 dereceden dik duvarın
+yanında kubbe teğet başlayamaz, panel bu kenarları sayar. İç bükey çizgi, keskin köşe ve delikli yüz çalışır.

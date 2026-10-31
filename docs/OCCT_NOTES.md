@@ -113,3 +113,15 @@ any sweep, boolean or interactive PartDesign tool in this repository.
 Run heavy or experimental OCCT loops in a **separate `freecadcmd` process**
 (`freecadcmd script.py --pass args`), never in a live FreeCAD session: a slow sweep there freezes the GUI and
 unsaved work can be lost. `doc.saveCopy(path)` gets a user's geometry out without touching their document.
+
+## Dome (measured in FreeCAD 26.3)
+
+- A tangent cap thins to nothing at its rim, and fusing it with the solid gave 0 solids or an invalid result. Replacing the
+  face inside the solid gives the same geometry with no boolean. Real booleans are only the fallback for collisions.
+- `Part.Face(bspline, wire)` has no pcurves (area 0, invalid). `face.fix(...)` adds them, then `cutHoles` works. Use
+  `limitTolerance` to raise edge tolerances: `fixTolerance` can lower them below what `fix` found, and the solid goes invalid.
+- Those pcurves fail the BOP check on curved edges (circle, B-spline) at any tolerance up to 5e-3 on most shapes. Straight
+  edges pass at 1e-5. Own 2D curves with `toShape(surface)` plus sewing were worse: edges stayed unmerged, solid invalid.
+- `surface.parameter(p)` on a 43 x 43 pole B-spline costs about 30 ms. When u, v are plane coordinates, compute them directly.
+- GeomPlate (`MakeFilling`) with G1 supports: 0.04 degrees on a rounded rectangle, but the fuse gave two solids there, and
+  holes and concave outlines gave invalid solids or gaps of 0.03-0.6 mm.

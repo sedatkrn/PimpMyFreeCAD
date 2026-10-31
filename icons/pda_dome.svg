@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- block -->
+  <path d="M6 40 L58 40 L58 58 L6 58 Z" fill="#71859f"/>
+  <!-- dome running tangent out of the rounded top edges -->
+  <path d="M6 44 C6 41 8 40 11 40 C20 40 22 18 32 18 C42 18 44 40 53 40 C56 40 58 41 58 44 Z" fill="#7fa6dc"/>
+  <path d="M11 40 C20 40 22 18 32 18 C42 18 44 40 53 40" fill="none" stroke="#2b5490" stroke-width="2"/>
+  <!-- height -->
+  <path d="M32 40 L32 20" fill="none" stroke="#f5c518" stroke-width="2.4"/>
+  <path d="M27 25 L32 18 L37 25 Z" fill="#f5c518"/>
+</svg>

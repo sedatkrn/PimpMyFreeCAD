@@ -77,6 +77,10 @@ class _RestoreObserver:
                for o in doc.Objects):
             import pda_magicloft
             pda_magicloft.repair_proxies(doc)
+        if any("SteepEdges" in o.PropertiesList and type(getattr(o, "Proxy", None)).__module__ != "pda_dome"
+               for o in doc.Objects):
+            import pda_dome
+            pda_dome.repair_proxies(doc)
 
 
 import FreeCAD as App

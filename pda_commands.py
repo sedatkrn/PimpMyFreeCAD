@@ -154,6 +154,51 @@ class _MagicLoft:
         pda_magicloft_gui.fresh = None
 
 
+class _Dome:
+    """Dome: secili duz yuzden kenarlarda komsu yuzlere teget kubbe (pda_dome). Gorev paneli hemen acilir."""
+
+    def GetResources(self):
+        return {"Pixmap": os.path.join(ICONS, "pda_dome.svg"), "MenuText": T("Dome"),
+                "ToolTip": T("PartDesign: raise a flat face into a dome that meets its edges tangent to the neighbouring "
+                             "faces. Round the edges first: next to a vertical wall it can't start tangent")}
+
+    def IsActive(self):
+        return App.ActiveDocument is not None
+
+    def Activated(self):
+        import pda_dome
+        faces = [(so.Object, sub) for so in Gui.Selection.getSelectionEx()
+                 for sub in so.SubElementNames if sub.split(".")[-1].startswith("Face")]
+        if len(faces) != 1:
+            App.Console.PrintWarning(T("Dome: select one flat face of a PartDesign Body.\n"))
+            return
+        obj, sub = faces[0]
+        if obj.TypeId == "PartDesign::Body":
+            obj, sub = obj.Tip, sub.split(".")[-1]
+        body = obj.getParentGeoFeatureGroup() if obj is not None and hasattr(obj, "getParentGeoFeatureGroup") else None
+        if body is None or body.TypeId != "PartDesign::Body":
+            App.Console.PrintWarning(T("Dome: select one flat face of a PartDesign Body.\n"))
+            return
+        doc = obj.Document
+        doc.openTransaction(T("Dome"))
+        new = pda_dome.make(body, obj, sub)
+        if isinstance(new, str):
+            doc.abortTransaction()
+            App.Console.PrintWarning(T(new) + "\n")
+            return
+        doc.recompute()
+        if new.BaseFeature is not None and "Invalid" not in new.State:
+            new.BaseFeature.ViewObject.Visibility = False
+            new.ViewObject.Visibility = True
+        doc.commitTransaction()
+        Gui.Selection.clearSelection()
+        Gui.Selection.addSelection(new)
+        import pda_dome_gui                                # panelin Cancel'i bu olusturma adimini da geri alir
+        pda_dome_gui.fresh = new
+        Gui.ActiveDocument.setEdit(new, 0)
+        pda_dome_gui.fresh = None
+
+
 def _edge_profiles(so):
     """Secili kenarlardan profiller: her kapali halka bir profil, (nesne, ["EdgeN", ...]). Kapanmayan kenarlar
     (kare halkanin tek bir kenari gibi) profil olmaz."""
@@ -202,11 +247,12 @@ class _OwnBody:
         set_own_body(bool(checked) if checked is not None else not own_body())
 
 
-COMMANDS = ["PDA_RailPipe", "PDA_RailGroove", "PDA_MagicLoft", "PDA_MagicLoftCut"]
+COMMANDS = ["PDA_RailPipe", "PDA_RailGroove", "PDA_MagicLoft", "PDA_MagicLoftCut", "PDA_Dome"]
 OPTIONS = ["PDA_RailPipeOwnBody"]
 
 Gui.addCommand("PDA_RailPipe", _RailPipe(False))
 Gui.addCommand("PDA_RailGroove", _RailPipe(True))
 Gui.addCommand("PDA_MagicLoft", _MagicLoft(False))
 Gui.addCommand("PDA_MagicLoftCut", _MagicLoft(True))
+Gui.addCommand("PDA_Dome", _Dome())
 Gui.addCommand("PDA_RailPipeOwnBody", _OwnBody())
