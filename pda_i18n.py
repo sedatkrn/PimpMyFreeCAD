@@ -153,6 +153,8 @@ TR = {
         'Et kalınlığı',
     'Rail Pipe: the wall is too thick for the profile':
         'Raylı boru: et kalınlığı profil için fazla',
+    'New Magic Lofts in their own Body':
+        "Yeni Sihirli Loft'lar kendi Body'sinde",
     'New Rail Pipes in their own Body':
         "Yeni raylı borular kendi Body'sinde",
     "PartDesign: each new Rail Pipe gets its own Body, so pipes don't recompute and fuse together (faster). Applies to the next pipe; in the Part workbench pipes are always separate solids":
@@ -201,8 +203,14 @@ TR = {
         'Raylı boru: iki kılavuz noktası üst üste',
     'Reversed':
         'Ters',
+    'Guide influence':
+        'Rehber etkisi',
+    'How far a guide acts sideways: larger gives a broader, smoother surface between guides, smaller a narrower ridge':
+        'Rehberin yana ne kadar etki ettiği: büyük değer rehberler arasında daha geniş ve düzgün yüzey, küçük değer daha dar bir sırt verir',
     'Selected point':
         'Seçili nokta',
+    'Ctrl+click guide points to select several: they move and delete together':
+        'Birden çok rehber noktası seçmek için Ctrl+tık: birlikte taşınır ve silinir',
     'Tension':
         'Gerginlik',
     'The guide follows the dragged point like a cable':

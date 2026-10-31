@@ -281,7 +281,10 @@ def _combine(base, tool, sub, refine, fuzzy=0.0):
             hit = True
         (near if hit else far).append(s)
     if near:
-        part = near[0] if len(near) == 1 else Part.makeCompound(near)
+        # kopyalar: boolean girdinin toleranslarini yerinde buyutebiliyor, basarisiz deneme bile onceki adimin seklini
+        # kalici bozuyordu (Pad'de 34 mm kose toleransi, sonraki denemeler ve STEP de bozuluyordu)
+        part = (near[0] if len(near) == 1 else Part.makeCompound(near)).copy()
+        tool = tool.copy()
         if fuzzy > 0:
             r = part.cut(tool, fuzzy) if sub else part.fuse(tool, fuzzy)
         else:
@@ -291,7 +294,8 @@ def _combine(base, tool, sub, refine, fuzzy=0.0):
         if not r.isValid() or (not r.Solids and not sub):
             return None
         try:
-            common = part.common(tool, fuzzy).Volume if fuzzy > 0 else part.common(tool).Volume
+            a, b = part.copy(), tool.copy()
+            common = a.common(b, fuzzy).Volume if fuzzy > 0 else a.common(b).Volume
         except Exception:
             return None
         want = part.Volume - common if sub else part.Volume + tool.Volume - common

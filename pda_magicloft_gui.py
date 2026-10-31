@@ -2,8 +2,9 @@
 # Pimp My PartDesign - Magic Loft: ekranda duzenleme ve gorev paneli. Copyright (c) 2026 Sedat Kuran - MIT License
 #
 # Magic Loft'a cift tiklayinca (setEdit): profil ve rehber listeleri, uc kisitlari, "Hazir rehber ciz". Otomatik
-# rehberler sari cizgi, noktalari tutamak (kesit noktalari sabit, beyaz); secili noktada Tasi gizmosu. Yesil connector
-# noktalari kesitlerin dikisini duzeltir (secilen rehber varken eslesmeyi rehber belirler, gizlenir). Surukerken yalniz
+# rehberler sari cizgi, noktalari tutamak (kesit noktalari sabit, beyaz; Ctrl+tik ile coklu secim); secili noktada Tasi
+# gizmosu. Yesil connector noktalari kesitlerin dikisini duzeltir, kenar uclarini ve ortalarini yakalar (secilen rehber
+# varken eslesmeyi rehber belirler, gizlenir). Surukerken yalniz
 # numpy ile hafif ag; fare birakilinca gercek B-spline yuzey (boolean yok), Zebra aciksa yansima cizgileriyle.
 # Kati OK'e basinca hesaplanir; OK degisiklikleri tek geri alma adimi olarak birakir, Cancel geri alir.
 import numpy as np
@@ -22,6 +23,7 @@ _editor = None
 fresh = None                                               # komutun yeni olusturdugu nesne: Cancel onu da geri alir
 STRIPES = 32                                              # zebra dokusu: 16 acik, 16 koyu serit
 PREVIEW_ALPHA = 0.3                                        # gercek yuzey onizlemesinin saydamligi (zebra opak kalir)
+SNAP_PX = 12.0                                             # connector kenar ucu / ortasini bu kadar pikselden yakalar
 
 
 def start(obj):
@@ -82,7 +84,7 @@ class Editor(object):
         self.view = Gui.ActiveDocument.ActiveView
         self.gp = obj.getGlobalPlacement() if hasattr(obj, "getGlobalPlacement") else App.Placement()
         self.inv = self.gp.inverse()
-        self.sel = None                                    # secili nokta: (rehber, nokta sirasi)
+        self.picked = []                                   # secili noktalar: (rehber, nokta sirasi); sonuncu asil nokta
         self.span = None                                   # secili rehber yeri: (rehber, v)
         self.drag = None
         self.cable, self.elastic = False, 0.1
@@ -90,6 +92,7 @@ class Editor(object):
         self.zebra = sm._param().GetBool("MagicLoftZebra", False)
         self.error = None
         self.fresh = obj.Name if fresh is obj else None
+        ml.spread_prop(obj)
         self.doc.openTransaction(T("Edit Magic Loft"))
         self.r_coord, self.r_line = coin.SoCoordinate3(), coin.SoLineSet()
         self.f_coord, self.f_pts = coin.SoCoordinate3(), coin.SoPointSet()
@@ -99,6 +102,7 @@ class Editor(object):
         self.l_coord, self.l_line = coin.SoCoordinate3(), coin.SoLineSet()
         self.p_coord, self.p_line = coin.SoCoordinate3(), coin.SoLineSet()     # profiller (ara profiller de gorunsun)
         self.i_coord, self.i_pts = coin.SoCoordinate3(), coin.SoPointSet()     # ara profildeki sabit rehber noktalari
+        self.x_coord, self.x_pts = coin.SoCoordinate3(), coin.SoPointSet()     # connector surukleme: yakalama yerleri
         self.root = coin.SoAnnotation()
         for n in (_style((0.2, 0.75, 0.95), 2.0, self.p_coord, self.p_line),
                   _style((0.98, 0.80, 0.15), 2.5, self.r_coord, self.r_line),
@@ -106,6 +110,7 @@ class Editor(object):
                   _style((0.95, 0.95, 0.95), 10, self.f_coord, self.f_pts),
                   _style((0.2, 0.75, 0.95), 10, self.i_coord, self.i_pts),
                   _style((0.98, 0.80, 0.15), 10, self.m_coord, self.m_pts),
+                  _style((0.6, 1.0, 0.65), 8, self.x_coord, self.x_pts),
                   _style((0.1, 0.9, 0.25), 13, self.c_coord, self.c_pts),
                   _style((1.0, 0.30, 0.0), 14, self.s_coord, self.s_pts)):
             self.root.addChild(n)
@@ -128,6 +133,15 @@ class Editor(object):
         self.reload()
         Gui.Control.closeDialog()
         Gui.Control.showDialog(self.panel)
+
+    @property
+    def sel(self):
+        """Asil secili nokta: gizmo ve koordinatlar onda."""
+        return self.picked[-1] if self.picked else None
+
+    @sel.setter
+    def sel(self, key):
+        self.picked = [] if key is None else [key]
 
     # --- koordinatlar ---
     def world(self, p):
@@ -178,7 +192,7 @@ class Editor(object):
         sk = self.skin
         if sk is None:
             for c, n in ((self.f_coord, self.f_pts), (self.m_coord, self.m_pts), (self.s_coord, self.s_pts),
-                         (self.c_coord, self.c_pts), (self.i_coord, self.i_pts)):
+                         (self.c_coord, self.c_pts), (self.i_coord, self.i_pts), (self.x_coord, self.x_pts)):
                 _set_points(c, n, [])
             _set_lines(self.p_coord, self.p_line, [])
             _set_lines(self.r_coord, self.r_line, [])
@@ -201,7 +215,7 @@ class Editor(object):
         _set_points(self.f_coord, self.f_pts, [self.world(n[3]) for n in fixed if n[2] in (0.0, 1.0)])
         _set_points(self.i_coord, self.i_pts, [self.world(n[3]) for n in fixed if n[2] not in (0.0, 1.0)])
         _set_points(self.m_coord, self.m_pts, [self.world(n[3]) for n in N if n[1] is not None])
-        cur = [n for n in N if n[1] is not None and self.sel == (n[0], n[1])]
+        cur = [n for n in N if n[1] is not None and (n[0], n[1]) in self.picked]
         _set_points(self.s_coord, self.s_pts, [self.world(n[3]) for n in cur])
         if self.connector_on():
             con = [self.world(p) for p in self.connectors()]
@@ -210,8 +224,13 @@ class Editor(object):
         else:
             _set_points(self.c_coord, self.c_pts, [])
             _set_lines(self.l_coord, self.l_line, [])
+        snaps = []
+        if self.drag is not None and self.drag["key"][0] == "connector":
+            snaps = [self.world(p) for p in self.snap_points(self.drag["i"])]
+        _set_points(self.x_coord, self.x_pts, snaps)
         if self.drag is None or self.drag["key"][0] == "point":
-            self.gizmo.place(self.world(cur[0][3]) if cur else None)
+            main = [n for n in cur if (n[0], n[1]) == self.sel]
+            self.gizmo.place(self.world(main[0][3]) if main else None)
         self._mesh()
 
     # hafif ag: yalniz numpy, surukleme adiminda
@@ -379,6 +398,10 @@ class Editor(object):
     def _screen(self, p):
         return self.view.getPointOnViewport(self.world(p))
 
+    @staticmethod
+    def _dist(s, pos):
+        return ((s[0] - pos[0]) ** 2 + (s[1] - pos[1]) ** 2) ** 0.5
+
     def pick_node(self, pos, radius=12.0):
         best = None
         for n in getattr(self, "N", []):
@@ -431,6 +454,17 @@ class Editor(object):
             self.end_drag()
         n = self.pick_node(pos)
         key = None
+        if n is not None and ev.wasCtrlDown():             # Ctrl+tik: secime ekle / cikar
+            cb.setHandled()
+            k = (n[0], n[1])
+            if k in self.picked:
+                self.picked.remove(k)
+            else:
+                self.picked.append(k)
+            self.span = None
+            self.redraw()
+            self.panel.sync()
+            return
         if n is None or (n[0], n[1]) == self.sel:
             key = self.gizmo.pick(pos)
             if key is not None:
@@ -445,6 +479,10 @@ class Editor(object):
                 return
             sp = self.pick_rail(pos)
             if sp is None:
+                if self.picked:                            # bos yere tik: secim kalkar
+                    self.sel = None
+                    self.redraw()
+                    self.panel.sync()
                 return
             cb.setHandled()
             self.sel, self.span = None, sp
@@ -452,10 +490,15 @@ class Editor(object):
             self.panel.sync()
             return
         cb.setHandled()
-        self.sel, self.span = (n[0], n[1]), None
+        k = (n[0], n[1])
+        self.span = None
+        if k in self.picked:                               # secimdeki nokta: hepsi birlikte tasinir, bu asil olur
+            self.picked.remove(k)
+            self.picked.append(k)
+        else:
+            self.sel = k
         if n[1] is not None:
-            self.drag = dict(key=key or ("point", 0), w0=self.world(n[3]), j=n[0], k=n[1],
-                             off0=np.array(self.skin.auto[n[0]][n[1]][1]), auto0=self._copy_auto())
+            self.drag = dict(key=key or ("point", 0), w0=self.world(n[3]), j=n[0], k=n[1], auto0=self._copy_auto())
             self.drag["ref"] = self.measure(pos)
             self._clear_real()
         self.redraw()
@@ -509,13 +552,22 @@ class Editor(object):
         self.gizmo.place(g["w0"] + dw)
         self.move_to(g, np.array(tuple(self.local_dir(dw))))
 
+    def snap_points(self, i):
+        """Kesit i'nin yakalama yerleri: kenar uclari ve ortalari."""
+        sec = self.skin.secs[i]
+        return sec.at(np.array(sec.snaps) - sec.shift)
+
     def drag_connector(self, i, pos):
         sk = self.skin
         sec = sk.secs[i]
-        P = sec.P[::4]
-        S = [self._screen(p) for p in P]
-        k = min(range(len(S)), key=lambda q: (S[q][0] - pos[0]) ** 2 + (S[q][1] - pos[1]) ** 2)
-        value = (sec.s[::4][k] - sk.base_conn[i]) % 1.0
+        dist = lambda p: self._dist(self._screen(p), pos)
+        d = [dist(p) for p in self.snap_points(i)]
+        q = int(np.argmin(d))
+        if d[q] < SNAP_PX:
+            x = sec.snaps[q]
+        else:
+            x = sec.s[::4][min(range(len(sec.P[::4])), key=lambda k: dist(sec.P[::4][k]))]
+        value = (x - sk.base_conn[i]) % 1.0
         conn = list(self.obj.ConnectorOffsets) + [0.0] * len(sk.secs)
         conn[i] = float(value)
         self.obj.ConnectorOffsets = conn[:len(sk.secs)]
@@ -523,14 +575,14 @@ class Editor(object):
         self.redraw()
 
     def move_to(self, g, d):
-        """Surukleme baslangicina gore d (yerel): yalniz nokta ya da Move neighbors ile kablo gibi."""
+        """Surukleme baslangicina gore d (yerel): secili noktalar birlikte ya da tek noktada Move neighbors ile kablo gibi."""
         sk = self.skin
-        j, k = g["j"], g["k"]
         data = [[(v, np.array(o)) for v, o in pts] for pts in g["auto0"]]
-        if self.cable:
-            self._cable(data, j, k, d)
+        if self.cable and len(self.picked) < 2:
+            self._cable(data, g["j"], g["k"], d)
         else:
-            data[j][k] = (data[j][k][0], g["off0"] + d)
+            for j, k in self.picked:
+                data[j][k] = (data[j][k][0], data[j][k][1] + d)
         sk.auto = data
         self.redraw()
         self.panel.sync()
@@ -564,7 +616,7 @@ class Editor(object):
         setattr(t, "xyz"[axis], val)
         if (t - w).Length < 1e-9:
             return
-        g = dict(j=cur[0][0], k=cur[0][1], off0=np.array(self.skin.auto[cur[0][0]][cur[0][1]][1]), auto0=self._copy_auto())
+        g = dict(j=cur[0][0], k=cur[0][1], auto0=self._copy_auto())
         self.move_to(g, np.array(tuple(self.local_dir(t - w))))
         ml.set_auto(self.obj, self.skin.auto)
         self.show_real()
@@ -596,9 +648,10 @@ class Editor(object):
         self.panel.sync()
 
     def delete_point(self):
-        if not self.auto_mode() or self.sel is None or self.sel[1] is None:
+        if not self.auto_mode() or not self.picked:
             return
-        del self.skin.auto[self.sel[0]][self.sel[1]]
+        for j, k in sorted(self.picked, reverse=True):     # sondan: kalanlarin sirasi kaymaz
+            del self.skin.auto[j][k]
         ml.set_auto(self.obj, self.skin.auto)
         self.sel = None
         self.redraw()
@@ -720,18 +773,26 @@ class Panel(object):
         self.count.setToolTip(T("Changing the number rebuilds the automatic guides; edits on them are lost"))
         self.count.valueChanged.connect(lambda v: self.ed.set_guide_count(v))
         grid.addWidget(self.count, 0, 3)
+        grid.addWidget(QtWidgets.QLabel(T("Guide influence")), 1, 0, 1, 2)
+        self.spread = self._spin(0.5, 4.0, 2, " x", 0.25)
+        self.spread.setToolTip(T("How far a guide acts sideways: larger gives a broader, smoother surface between "
+                                 "guides, smaller a narrower ridge"))
+        self.spread.setValue(float(ed.obj.GuideSpread))
+        self.spread.valueChanged.connect(lambda v: self.ed.set_prop("GuideSpread", float(v)))
+        grid.addWidget(self.spread, 1, 2, 1, 2)
         self.guides = QtWidgets.QListWidget()
         self.guides.setMaximumHeight(70)
-        grid.addWidget(self.guides, 1, 0, 1, 4)
+        grid.addWidget(self.guides, 2, 0, 1, 4)
         self.g_add = QtWidgets.QPushButton(T("Add selection"))
         self.g_add.clicked.connect(lambda checked=False: self.add_guides())
-        grid.addWidget(self.g_add, 2, 0, 1, 2)
+        grid.addWidget(self.g_add, 3, 0, 1, 2)
         self.g_del = QtWidgets.QPushButton(T("Remove"))
         self.g_del.clicked.connect(lambda checked=False: self.remove_guide())
-        grid.addWidget(self.g_del, 2, 2, 1, 2)
+        grid.addWidget(self.g_del, 3, 2, 1, 2)
         lay.addWidget(g)
         # secili nokta
         g = QtWidgets.QGroupBox(T("Selected point"))
+        g.setToolTip(T("Ctrl+click guide points to select several: they move and delete together"))
         self.point_box = g
         grid = QtWidgets.QGridLayout(g)
         self.xyz = []
@@ -776,9 +837,9 @@ class Panel(object):
         tol.setValue(float(ed.obj.FitTolerance))
         tol.valueChanged.connect(lambda v: self.ed.set_prop("FitTolerance", float(v)))
         grid.addWidget(tol, 1, 1)
-        own = QtWidgets.QCheckBox(T("New Rail Pipes in their own Body"))
-        own.setChecked(pda_commands.own_body())
-        own.toggled.connect(pda_commands.set_own_body)
+        own = QtWidgets.QCheckBox(T("New Magic Lofts in their own Body"))
+        own.setChecked(pda_commands.own_body("MagicLoftOwnBody"))
+        own.toggled.connect(lambda on: pda_commands.set_own_body(on, "MagicLoftOwnBody"))
         grid.addWidget(own, 2, 0, 1, 2)
         lay.addWidget(g)
         lay.addStretch()
@@ -866,7 +927,8 @@ class Panel(object):
         for x in (self.guides, self.g_add, self.g_del):    # pasif mod: secimler saklanir, soluk gorunur
             x.setEnabled(not auto)
         self.point_box.setEnabled(auto)
-        cur = [n for n in getattr(ed, "N", []) if ed.sel == (n[0], n[1]) and n[1] is not None]
+        self.cable.setEnabled(len(ed.picked) < 2)          # kablo tek noktada; birden coksu birlikte tasinir
+        cur =[n for n in getattr(ed, "N", []) if ed.sel == (n[0], n[1]) and n[1] is not None]
         for k, b in enumerate(self.xyz):
             b.setEnabled(bool(cur))
             if cur and not b.hasFocus():

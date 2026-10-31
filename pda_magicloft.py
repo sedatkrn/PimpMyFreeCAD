@@ -25,6 +25,7 @@ M = 720                     # kesit basina ornek sayisi
 ENDS = ["Free", "Normal", "Tangent"]
 TOUCH_TOL = 0.05            # secilen rehber kesite en fazla bu kadar uzak olabilir (mm)
 CORNER_DEG = 15.0           # kenar birlesiminde bu acinin ustu kosedir
+SPREAD = 2.0                # yeni nesnede rehber etkisi
 
 
 def _np(v):
@@ -98,10 +99,11 @@ def read_profile(o, subs, glob):
 
 
 def _samples(w):
-    """Telin ornekleri (kapali, son = ilk), yay boyu oranlari ve koseler (oran). Koseler tam ornek noktasindadir."""
+    """Telin ornekleri (kapali, son = ilk), yay boyu oranlari, koseler ve yakalama yerleri (kenar uclari ve ortalari,
+    oran). Koseler ve kenar uclari tam ornek noktasindadir."""
     E = w.OrderedEdges
     total = sum(e.Length for e in E)
-    pts = []
+    pts, ends = [], [0]
     for i, e in enumerate(E):
         q = [_np(p) for p in e.discretize(Number=max(2, int(round(M * e.Length / total))) + 1)]
         if pts:
@@ -113,6 +115,7 @@ def _samples(w):
             if min(np.linalg.norm(q[0] - x) for x in nxt) < min(np.linalg.norm(q[-1] - x) for x in nxt):
                 q.reverse()
         pts += q
+        ends.append(len(pts) - 1)
     P = np.array(pts)
     if np.linalg.norm(P[0] - P[-1]) > 1e-9:
         P = np.vstack([P, P[:1]])
@@ -130,7 +133,8 @@ def _samples(w):
             cs = a.dot(b) / max(np.linalg.norm(a) * np.linalg.norm(b), 1e-12)
             if cs < math.cos(math.radians(CORNER_DEG)):
                 corners.append(float(s[i]))
-    return P, s, corners
+    snaps = [float(s[a]) for a in ends[:-1]] + [float(s[a] + s[b]) / 2 for a, b in zip(ends, ends[1:])]
+    return P, s, corners, snaps
 
 
 class Section(object):
@@ -138,7 +142,7 @@ class Section(object):
 
     def __init__(self, prof):
         self.wire, c, n, self.solid = prof
-        self.P, self.s, self.corners = _samples(self.wire)
+        self.P, self.s, self.corners, self.snaps = _samples(self.wire)
         self.c = self.P[:-1].mean(axis=0)
         self.shift = 0.0
         self.tan = None                                    # yuzeye teget: oran basina birim yon
@@ -149,6 +153,7 @@ class Section(object):
     def flip(self):
         self.P, self.s = self.P[::-1].copy(), 1.0 - self.s[::-1]
         self.corners = [(1.0 - c) % 1.0 for c in self.corners]
+        self.snaps = [(1.0 - c) % 1.0 for c in self.snaps]
         self.n = -self.n
 
     def at(self, u):
@@ -271,9 +276,10 @@ def spline_weights(vn, vq, clamp0, clamp1):
     return W
 
 
-def _cardinal(us):
-    """Periyodik kardinal fonksiyonlar: rehber konumlarinda 1 / 0. fn(u) -> (len(u), n)."""
-    w = 0.5 if len(us) < 3 else 1.0 / len(us)
+def _cardinal(us, spread=1.0):
+    """Periyodik kardinal fonksiyonlar: rehber konumlarinda 1 / 0. fn(u) -> (len(u), n). spread: rehberin yana etkisi;
+    1'de rehber yuzeyi cadir diregi gibi kaldiriyordu (utu: rehberde R 1.6 mm, 2'de R 4 mm, kesitte dalga da azaldi)."""
+    w = spread * (0.5 if len(us) < 3 else 1.0 / len(us))
     d = lambda a, b: np.exp(-(np.sin(np.pi * (a[:, None] - b[None, :])) / w) ** 2)
     Ki = np.linalg.inv(d(us, us))
     return lambda u: d(np.asarray(u, float), us).dot(Ki)
@@ -326,6 +332,7 @@ class Skin(object):
         self.auto = None
         self.us = np.zeros(0)
         self.card = None
+        self.spread = 1.0
         self.S = self.A = None
         self._match()
 
@@ -340,7 +347,7 @@ class Skin(object):
                 best = None
                 for j, b in enumerate(br):
                     d = abs((c - b + 0.5) % 1.0 - 0.5)
-                    if j not in used and d < 0.5 / max(len(br), 1) and (best is None or d < best[0]):
+                    if j not in used and d < 0.5 / max(len(br), 1) - 1e-6 and (best is None or d < best[0]):
                         best = (d, j)
                 if best is None:                           # eslesmeyen kose: yeni kirilma
                     br.append(c)
@@ -384,7 +391,7 @@ class Skin(object):
         order = np.argsort(us)
         self.us, self.S, self.A = us[order], S[:, order], A[:, order]
         self.rails = [rails[k] for k in order]
-        self.card = _cardinal(self.us)
+        self.card = _cardinal(self.us, self.spread)
         # koseli olmayan kesitte eslesme yumusak: parca parca dogrusal esleme yuzeye hiz kirigi birakiyor, kontrol noktasi
         # tavana dayaniyordu (128). Geri donen (katlanan) esleme olursa dogrusala donulur.
         x = np.arange(720) / 720.0
@@ -419,7 +426,7 @@ class Skin(object):
         """Otomatik rehberler: data[j] = [(v, ofset), ...]; ofset, nokta ile S1 arasindaki fark."""
         self.rails = []
         self.us = self.auto_us(n)
-        self.card = _cardinal(self.us)
+        self.card = _cardinal(self.us, self.spread)
         self.auto = data
 
     def _warp(self, i, u):
@@ -612,6 +619,17 @@ def _cap(edges):
             return f
     except Exception:
         pass
+    # Part.Face tek periyodik kenarda duzlemi bulamayabiliyor: dolgu yuzey duz kapagi 1 % fazla alanla sisiriyordu
+    P = np.array([tuple(p) for p in w.discretize(Number=193)[:192]])
+    c = P.mean(axis=0)
+    n = np.linalg.svd(P - c)[2][2]
+    if np.abs((P - c).dot(n)).max() < 1e-4:
+        try:
+            f = Part.Face(Part.Plane(V(*c), V(*n)), w)
+            if f.isValid():
+                return f
+        except Exception:
+            pass
     return Part.makeFilledFace(edges)
 
 
@@ -721,6 +739,7 @@ def prepare(obj):
                 tails[k] = min(0.5, 0.05 * p[0].BoundBox.DiagonalLength)
     sk = Skin(secs, ends[0], ends[1], tails, max(float(obj.FitTolerance), 1e-4))
     sk.strength = (obj.StartStrength, obj.EndStrength)
+    sk.spread = float(getattr(obj, "GuideSpread", 1.0))
     sk.base_conn = [s.shift for s in secs]
     conn = list(obj.ConnectorOffsets)
     if not obj.AutoGuides and get_items(obj, "Guides"):    # secilen rehberde eslesmeyi rehber belirler
@@ -822,6 +841,14 @@ def sort_chain(items, glob=False):
 
 
 # --- nesne ---
+def spread_prop(obj):
+    """Eski dosyalar: ozellik 1 ile eklenir, kayitli sekil degismez; yeni nesnede varsayilan SPREAD."""
+    if "GuideSpread" not in obj.PropertiesList:
+        obj.addProperty("App::PropertyFloat", "GuideSpread", "Loft",
+                        "How far a guide acts sideways: larger gives a broader, smoother surface between guides")
+        obj.GuideSpread = 1.0
+
+
 class MagicLoft:
     """Magic Loft (FeatureAdditivePython) / Magic Loft Cut (FeatureSubtractivePython) / Part kati nesnesinin Proxy'si."""
 
@@ -851,6 +878,8 @@ class MagicLoft:
         obj.addProperty("App::PropertyLength", "FitTolerance", "Loft",
                         "Largest deviation of the surface fit: smaller is more exact, larger has fewer control points")
         obj.FitTolerance = 0.02
+        spread_prop(obj)
+        obj.GuideSpread = SPREAD
         if not is_part(obj) and "Refine" not in obj.PropertiesList:
             obj.addProperty("App::PropertyBool", "Refine", "Base", "Merge coplanar faces of the result")
         if not is_part(obj):
@@ -887,6 +916,9 @@ class MagicLoft:
         if hasattr(obj, "AddSubShape"):
             obj.AddSubShape = tool
         obj.Shape = res[0]
+
+    def onDocumentRestored(self, obj):
+        spread_prop(obj)
 
     def dumps(self):
         return None
@@ -1016,6 +1048,7 @@ def repair_proxies(doc):
     for o in (doc.Objects if doc is not None else []):
         if PROPS in getattr(o, "PropertiesList", []) and not isinstance(getattr(o, "Proxy", None), MagicLoft):
             o.Proxy = MagicLoft.__new__(MagicLoft)
+            spread_prop(o)
             if App.GuiUp and not isinstance(getattr(o.ViewObject, "Proxy", None), ViewProviderMagicLoft):
                 o.ViewObject.Proxy = ViewProviderMagicLoft.__new__(ViewProviderMagicLoft)
             o.touch()

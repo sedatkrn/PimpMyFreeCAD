@@ -10,6 +10,14 @@
 - Magic Loft fixes: a Normal / Tangent end on the last profile no longer flings the surface far away (it could reach
   the profile from behind); profiles at 90 degrees keep the same turning sense; Cancel right after the command now
   removes the new feature and brings back Tip and visibility, and Cancel on a re-edit really restores the old values.
+- Magic Loft editing: guide points can be multi-selected with Ctrl+click and move or delete together. A dragged green
+  connector point snaps to edge ends and edge midpoints of its profile, which are marked during the drag.
+- Magic Loft **Guide influence** setting: a moved guide no longer has to pull the surface up like a tent pole. New
+  features use 2 x; on a test file the radius at the guide went from 1.6 mm to 4 mm. Saved features keep 1 x.
+- The Magic Loft panel's own-Body option now has its own text and setting instead of sharing Rail Pipe's.
+- Magic Loft / Rail Pipe booleans now work on copies: an attempt could permanently raise tolerances on the previous
+  feature's shape (34 mm at a vertex of a Pad), which broke later attempts and its STEP export. A flat Magic Loft end
+  whose face OCCT could not build no longer gets a bulged cap.
 - Saved documents keep their parametric chain: with the add-in junctioned into Mod, FreeCAD 26.3 blocked the import of
   pda_magicloft / pda_railpipe on open, so features opened without their code. The modules now load at start-up. The
   repair of such objects never ran (its signal doesn't fire in 26.3); it now runs when a document becomes active, so

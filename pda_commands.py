@@ -116,7 +116,7 @@ class _MagicLoft:
             return
         doc = prof[0][0].Document
         part = not self.sub and _workbench() == "PartWorkbench"
-        own = not self.sub and not part and own_body()
+        own = not self.sub and not part and own_body("MagicLoftOwnBody")
         body = None
         if not (part or own):
             items = prof + guides
@@ -173,15 +173,15 @@ def _workbench():
         return ""
 
 
-def own_body():
-    """Secenek: PartDesign'da her yeni Rail Pipe kendi Body'sinde (Preferences/Mod/PimpMyPartDesign/RailPipeOwnBody)."""
+def own_body(name="RailPipeOwnBody"):
+    """Secenek: PartDesign'da her yeni Rail Pipe / Magic Loft kendi Body'sinde (Preferences/Mod/PimpMyPartDesign/...)."""
     import pda_common
-    return pda_common._param().GetBool("RailPipeOwnBody", False)
+    return pda_common._param().GetBool(name, False)
 
 
-def set_own_body(on):
+def set_own_body(on, name="RailPipeOwnBody"):
     import pda_common
-    pda_common._param().SetBool("RailPipeOwnBody", bool(on))
+    pda_common._param().SetBool(name, bool(on))
 
 
 class _OwnBody:

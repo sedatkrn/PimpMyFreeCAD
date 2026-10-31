@@ -57,10 +57,14 @@ It builds one low-pole surface instead of a dense sweep: fast, and made to take 
 - **Start / end constraints:** *Free*, *Normal to profile* or *Tangent to face* per end, with a strength. An end on a
   solid's face starts as Normal, a sketch end as Free.
 - **Edit on screen:** double-click the feature (the panel also opens right after creating one). Move the yellow points
-  of the automatic guides with the Move gizmo, add and delete points, use *Move neighbors*. Drag the green **connector**
-  dots to fix a twist (hidden with selected guides, which set the matching themselves). While dragging you see a
+  of the automatic guides with the Move gizmo, add and delete points, use *Move neighbors* (one point at a time).
+  Ctrl+click selects several points, which move and delete together. Drag the green **connector** dots to fix a twist;
+  they snap to edge ends and midpoints (hidden with selected guides, which set the matching themselves). While dragging you see a
   light mesh; on release the real surface; *Zebra* shows reflection stripes on it. The solid is computed on **OK**.
-- **Part workbench:** a standalone solid outside any Body. *Own Body* works as for Rail Pipe.
+- **Guide influence:** how far a guide acts sideways. A larger value lifts a broader area instead of a narrow ridge
+  (new features start at 2 x; features saved earlier keep 1 x, so their shape doesn't change until you raise it).
+- **Part workbench:** a standalone solid outside any Body. *New Magic Lofts in their own Body* in the panel works like Rail Pipe's own
+  option, but is set separately.
 
 Limits: a **corner-to-round** transition (hexagon to circle) gets no wall from PartDesign Thickness and no error from it;
 the feature warns about it. Cut the inside with a Magic Loft Cut from inset profiles instead. Close loft, a centerline,
