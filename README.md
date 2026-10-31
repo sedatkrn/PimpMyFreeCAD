@@ -9,6 +9,11 @@ Requires **FreeCAD 1.0 or newer** (developed on 26.3). No extra Python packages.
 
 ## Rail Pipe / Rail Groove
 
+<p>
+  <img src="docs/images/rail-pipe-manifold.webp" width="49%" alt="Four Rail Pipes joining a motor body to a collector">
+  <img src="docs/images/rail-pipe-edit.webp" width="49%" alt="Editing a Rail Pipe guide on screen with the Move gizmo">
+</p>
+
 Sweeps a profile along a guide curve and adds it to the Body (**Rail Pipe**) or cuts it out (**Rail Groove**).
 
 - **Profiles:** select one or two **flat faces**, **closed edges** (a circular edge or a closed flat loop) or
@@ -44,6 +49,11 @@ scale per guide point yet.
 
 ## Magic Loft / Magic Loft Cut
 
+<p>
+  <img src="docs/images/magic-loft-star.png" width="49%" alt="Magic Loft from a circle through star-shaped sections">
+  <img src="docs/images/magic-loft-zebra.png" width="49%" alt="Magic Loft with automatic guides and zebra stripes">
+</p>
+
 A clean loft through two or more closed profiles, added to the Body (**Magic Loft**) or cut out (**Magic Loft Cut**).
 It builds one low-pole surface instead of a dense sweep: fast, and made to take PartDesign Thickness and export to STEP.
 
@@ -71,6 +81,12 @@ the feature warns about it. Cut the inside with a Magic Loft Cut from inset prof
 curvature (G2) ends and open profiles are not available.
 
 ## Dome
+
+<p>
+  <img src="docs/images/dome-bullet.png" width="32%" alt="Dome on a cylinder end, bullet shape">
+  <img src="docs/images/dome-d-shape.png" width="32%" alt="Dome on a D-shaped Pad with sharp corners">
+  <img src="docs/images/dome-slot.png" width="32%" alt="Dome on a rounded slot outline">
+</p>
 
 Raises a flat face into a cap that runs tangent into the faces around it, like the Dome command in other CAD systems.
 Select one flat face of a Body and press **Dome**. The panel has *Height*, *Reversed* (cut into the solid) and *Tangent to
