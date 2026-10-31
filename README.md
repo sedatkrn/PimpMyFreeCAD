@@ -77,10 +77,11 @@ Select one flat face of a Body and press **Dome**. The panel has *Height*, *Reve
 steep walls*, and the real solid updates as you change them. **OK** keeps it as one undo step; **Cancel** reverts it and
 removes a new feature. The panel shows the measured tangent error.
 
-- **Vertical walls all around** (a plain Pad top, a cylinder end): the dome starts tangent to the walls and rises along a
-  quarter ellipse, like a bullet. The surface is exact (0 degrees, exact height). Sharp corners run up to the top as ridges.
-  It needs an outline fully visible from its centre and no holes. With *Tangent to steep walls* off you get a smooth bump
-  instead, with a free slope at the walls.
+- **Walls all around** (a plain or tapered Pad, a chamfer, a cylinder end): the dome starts along the walls at their own
+  slope and rises to the top like a bullet, with an exact height. The error is 0 degrees on vertical walls, cones and flat
+  chamfers, and about 0.01 degrees on a 12 degree tapered Pad with a curved outline. Sharp corners run up to the top as
+  ridges. It needs every neighbour at least 30 degrees from the face, an outline fully visible from its centre and no holes.
+  With *Tangent to steep walls* off you get a smooth bump instead, with a free slope at the walls.
 - **Filleted top edges:** the neighbour is horizontal, so the surface starts flat and rises in a gentle S (under 0.01
   degrees). Curved, concave and sharp-cornered outlines and faces with holes work; the dome returns to the face level at
   every hole.
@@ -88,9 +89,10 @@ removes a new feature. The panel shows the measured tangent error.
 Limits:
 - **Mixed edges and holes next to steep walls:** when only some neighbours are steep, or the face has a hole, those edges
   are not tangent. The edge stays sharp and the panel counts it.
-- **Drafted walls:** the bullet shape starts straight up, so it is off by the draft angle (5.7 degrees on a 5.7 degree wall).
-- **Slanted neighbours and low domes:** a chamfer needs enough height. A 45 degree chamfer on an 80 x 50 top is 29 degrees
-  off at 4 mm and 3 degrees off at 15 mm.
+- **Too tall on leaning walls:** when the walls would pass the centre before the top, the dome falls back to the smooth bump.
+  On a chamfered 80 x 50 top at 60 mm that is 3 degrees off; on a tapered Pad at 400 mm the edges are not tangent.
+- **Tapered Pads and STEP:** a tapered Pad with a curved outline came back from STEP with 3 of its 10 faces and no solid,
+  with or without a dome. The tapered Pad itself causes this; check the export.
 - **Filleted curved edges:** the edge between the dome and its neighbour can fail OCCT's strict BOP check, although the solid
   is valid and exports to STEP. Booleans away from the rim worked in every test.
 - **Thickness:** PartDesign Thickness works on smooth outlines. It failed or left the part unchanged on outlines with sharp
@@ -148,5 +150,5 @@ dik* ya da *Yüzeye teğet* olabilir. Yeşil connector noktaları burulmayı dü
 Köşeliden yuvarlağa geçişte PartDesign Thickness et vermez; içini Sihirli Loft Oyma ile boşaltın.
 
 **Kubbe (Dome):** bir Body'nin düz yüzünü seçip düğmeye basın, *Yükseklik* verin; yüz, kenarlarda komşu yüzlere teğet bir
-kubbeye dönüşür, *Ters* katının içine oyar. Dört yanı dik duvarsa kubbe duvarlara teğet başlar (mermi biçimi), keskin
-köşeler tepeye sırt olarak gider. Fillet'li kenarda düz başlar; iç bükey çizgi ve delikli yüz de çalışır.
+kubbeye dönüşür, *Ters* katının içine oyar. Çevresi duvarsa kubbe duvarın kendi eğimiyle teğet başlar (mermi biçimi; eğimli
+Pad ve pah da olur), keskin köşeler tepeye sırt olarak gider. Fillet'li kenarda düz başlar; iç bükey çizgi ve delikli yüz de çalışır.

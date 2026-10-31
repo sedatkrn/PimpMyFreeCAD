@@ -129,3 +129,8 @@ unsaved work can be lost. `doc.saveCopy(path)` gets a user's geometry out withou
   is an exact NURBS (arc poles times curve poles, weights multiplied), and its fuse is clean. Build it from
   `curve.toBSpline(a, b)` per quarter: a whole circle as one patch has parametric C0 knots, and the STEP volume came back
   46-120 mm3 off. `BSplineCurve.segment` raised an error on those knots.
+- Leaning walls: the middle pole row of those patches is each edge point moved along the wall to the top plane. At a sharp
+  corner the only direction tangent to both walls is their intersection; at a tangent joint both patches must use the same
+  averaged direction, or they leave a gap. Project the blended direction back into the wall on curved walls.
+- A Pad with `TaperAngle` on a curved sketch (8 B-spline wall faces) passes `isValid()` but its STEP round trip returned 3 of
+  10 faces and no solid, with no dome involved. Always round-trip the base when a result fails.

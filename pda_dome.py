@@ -19,7 +19,9 @@ from pda_i18n import T
 
 V = App.Vector
 FREE_DEG = 60.0             # komsu bu acidan dik: teget olunamaz (egim sonsuza gider), kenar egimi serbest birakilir
-CORNER_DEG = 10.0           # kenar birlesiminde bu acinin ustu kosedir: egim koseye dogru sifira iner
+WALL_DEG = 30.0             # butun komsular en az bu kadar egimliyse kubbe duvarlara teget cikar (pah da olur)
+ROW_TOL = 2e-3              # duvar boyunca orta sira: yukseklik basina izin verilen sapma
+CORNER_DEG = 10.0         # kenar birlesiminde bu acinin ustu kosedir: egim koseye dogru sifira iner
 CELLS = (40, 56)            # kenar boslugu buyukse ikinci, ince izgara
 GAP_OK = 1e-3               # mm
 GAP_MAX = 0.02              # mm: izgara yuz icin kaba (cok dar bolge)
@@ -303,8 +305,8 @@ def frame_normal(face):
 
 
 def can_ellipse(face, shape):
-    """Dik duvarli kubbe olur mu: tek dis cizgi, merkezden her kenar noktasi gorunur, butun komsular dik. Merkez (yuzun
-    agirlik merkezi) ya da hata degil None."""
+    """Duvarlara teget kubbe olur mu: tek dis cizgi, merkezden her kenar noktasi gorunur, butun komsular belirgin egimli
+    (neredeyse yatay komsu, fillet gibi, duvar boyunca tepe duzlemine cikamaz). Merkez (yuzun agirlik merkezi) ya da None."""
     if len(face.Wires) != 1:
         return None
     n = frame_normal(face)
@@ -318,7 +320,7 @@ def can_ellipse(face, shape):
         for t in np.linspace(e.FirstParameter, e.LastParameter, 21):
             p = e.valueAt(float(t))
             m = f.normalAt(*f.Surface.parameter(p))
-            if abs(m.dot(n)) / m.Length > np.cos(np.radians(FREE_DEG)):
+            if abs(m.dot(n)) / m.Length > np.cos(np.radians(WALL_DEG)):
                 return None
             turn.append(((p - c).cross(e.tangentAt(float(t))).dot(n)) * (-1.0 if e.Orientation == "Reversed" else 1.0))
     turn = np.array(turn)
@@ -327,22 +329,117 @@ def can_ellipse(face, shape):
     return c if (turn > 1e-6 * size).all() or (turn < -1e-6 * size).all() else None
 
 
-def ellipse_patches(face, center, height, sign):
-    """Her kenar icin bir yama: kenar egrisi merkeze dogru kuculurken ceyrek elips boyunca yukselir. Yay ve egri carpimi
-    tam NURBS: sinir kenarin kendisi, duvardaki teget tam yuzey normali yonunde. Yamalar tepede tek noktada bulusur;
-    keskin kose tepeye kadar sirt olarak gider."""
+def _wall_normal(f, p):
+    m = f.normalAt(*f.Surface.parameter(p))
+    m.normalize()
+    return m
+
+
+def _up_along(a, b, n):
+    """a x b dogrultusunda, n yonunde birim yukseklik veren vektor."""
+    d = a.cross(b)
+    return d * (1.0 / d.dot(n))
+
+
+def _corner_dirs(face, shape, n):
+    """Keskin koselerde iki duvarin ortak dogrultusu: {(kenar, uc): vektor}. Sirt iki yamada da ayni olmali ve iki duvara
+    da teget kalmali; bunu saglayan tek yon duvarlarin kesisimi."""
+    ends = []
+    for i, e in enumerate(face.Edges):
+        f = neighbour(shape, e, face)
+        for k, t in enumerate((e.FirstParameter, e.LastParameter)):
+            p = e.valueAt(t)
+            ends.append((i, k, p, _wall_normal(f, p), e.tangentAt(t)))
+    out = {}
+    for a, (i, k, p, m, d) in enumerate(ends):
+        for j, l, q, m2, d2 in ends[a + 1:]:
+            if j == i or (p - q).Length > 1e-5:
+                continue
+            if m.cross(m2).Length > np.sin(np.radians(1.0)):
+                c = _up_along(m, m2, n)
+            else:                                          # teget birlesim: iki yama ayni yonde bulussun, yoksa aralik kalir
+                c = (_up_along(m, d, n) + _up_along(m2, d2, n)) * 0.5
+            out[(i, k)] = out[(j, l)] = c
+    return out
+
+
+def _rational_basis(cv, ts):
+    """Egrinin kendi (rasyonel) tabani: ts noktalarinda satir basina kontrol noktalari."""
+    knots, deg = np.array(cv.KnotSequence), cv.Degree
+    w = np.array(cv.getWeights())
+    N = ((knots[:-1, None] <= ts) & (ts < knots[1:, None])).astype(float).T
+    N[ts >= knots[-1], :] = 0.0
+    N[ts >= knots[-1], len(knots) - deg - 2] = 1.0
+    for q in range(1, deg + 1):
+        M = np.zeros((len(ts), len(knots) - q - 1))
+        for i in range(M.shape[1]):
+            a, b = knots[i + q] - knots[i], knots[i + q + 1] - knots[i + 1]
+            if a > 0:
+                M[:, i] += (ts - knots[i]) / a * N[:, i]
+            if b > 0:
+                M[:, i] += (knots[i + q + 1] - ts) / b * N[:, i + 1]
+        N = M
+    R = N * w
+    return R / R.sum(axis=1)[:, None]
+
+
+def _wall_row(cv, f, n, height, sign, span, c0, c1):
+    """Orta sira kontrol noktalari: kenarin her noktasi duvar boyunca tepe duzlemine cikar. Yuzeyin kenardaki tegeti bu
+    yondedir. Duz duvarda iki kose yonu arasinda dogrusal kalir, bu yuzden duvar duzleminden cikmaz."""
+    a, b = span
+    ts = np.linspace(cv.FirstParameter, cv.LastParameter, max(24, 3 * cv.NbPoles))
+    Q, ends = [], {}
+
+    def steep(t):
+        p = cv.value(t)
+        d = _wall_normal(f, p).cross(cv.tangent(t)[0])
+        return p, d * (1.0 / d.dot(n))
+    for key, t, c in (("a", a, c0), ("b", b, c1)):         # uc farklari kenarin tam parametresinde
+        ends[key] = V(0, 0, 0) if c is None else c - steep(t)[1]
+    for t in ts:
+        p, d = steep(float(t))
+        s = (float(t) - a) / (b - a)
+        d = d + ends["a"] * (1.0 - s) + ends["b"] * s
+        m = _wall_normal(f, p)                             # kavisli duvarda kose duzeltmesi duvardan cikmasin
+        d = d - m * d.dot(m)
+        Q.append(tuple(p + d * (sign * height / d.dot(n))))
+    Q = np.array(Q)
+    R = _rational_basis(cv, ts)
+    W = np.ones(len(ts))
+    W[[0, -1]] = 1e4                                       # komsu yamalarla ayni uc
+    sol = np.linalg.lstsq(R * W[:, None], Q * W[:, None], rcond=None)[0]
+    return [V(*(float(x) for x in r)) for r in sol], float(np.abs(R.dot(sol) - Q).max())
+
+
+def ellipse_patches(face, shape, center, height, sign):
+    """Her kenar icin bir yama: kenardan duvar boyunca cikip tepeye ceyrek konik ile varir. Yay ve egri carpimi NURBS:
+    sinir kenarin kendisi, dik duvarda yuzey tam. Yamalar tepede tek noktada bulusur; keskin kose tepeye kadar sirt olarak
+    gider. Duvar o kadar yatik ki kenar merkezi gecerse ValueError."""
     n = frame_normal(face)
     n.normalize()
-    arc = ((1.0, 0.0, 1.0), (1.0, 1.0, np.sqrt(0.5)), (0.0, 1.0, 1.0))  # (olcek, yukseklik, agirlik)
+    corners = _corner_dirs(face, shape, n)
+    apex = center + n * (sign * height)
+    weights = (1.0, float(np.sqrt(0.5)), 1.0)
     out = []
-    for e in face.Edges:
+    for i, e in enumerate(face.Edges):
+        f = neighbour(shape, e, face)
+        span = (e.FirstParameter, e.LastParameter)
         for cv in _smooth_spans(e):
+            for _ in range(4):                             # egimli duvarda orta sira egrinin tabanina sigmayabilir: dugum ekle
+                mid, err = _wall_row(cv, f, n, height, sign, span, corners.get((i, 0)), corners.get((i, 1)))
+                if err < ROW_TOL * max(height, 1.0):
+                    break
+                k = cv.getKnots()
+                for a, b in zip(k[:-1], k[1:]):
+                    cv.insertKnot((a + b) / 2.0)
             P, W = cv.getPoles(), cv.getWeights()
-            poles = [[center + (p - center) * s + n * (sign * height * z) for p in P] for s, z, _ in arc]
-            weights = [[w * float(a) for w in W] for _, _, a in arc]
+            for p, q in zip(P, mid):
+                if (q - apex).dot(p - center) <= 0:
+                    raise ValueError("wall passes the centre")
+            poles = [P, mid, [apex] * len(P)]
             s = Part.BSplineSurface()
             s.buildFromPolesMultsKnots(poles, [3, 3], cv.getMultiplicities(), [0.0, 1.0], cv.getKnots(), False, False,
-                                       2, cv.Degree, weights)
+                                       2, cv.Degree, [[w * a for w in W] for a in weights])
             out.append((e, s))
     return out
 
@@ -494,7 +591,7 @@ class Dome:
     def ellipse(self, obj, base, face, center, height, sign):
         """Dik duvara teget kubbe. Boolean olmaz, duz plaka yuzeyine donulur: False."""
         try:
-            patches = ellipse_patches(face, center, height, sign)
+            patches = ellipse_patches(face, base, center, height, sign)
             tool = ellipse_tool(face, patches)
             if not tool.isValid():
                 return False
