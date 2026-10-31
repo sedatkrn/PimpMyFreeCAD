@@ -77,6 +77,8 @@ TR = {
         'Kenarlarda teğet hatası: %.3f derece',
     '%d edge(s) next to a steep wall are not tangent':
         '%d kenar dik duvarın yanında ve teğet değil',
+    "Dome: can't follow the walls here, using a smooth bump with sharp edges.\n":
+        'Kubbe: burada duvarları izleyemiyor, keskin kenarlı yumuşak tümsek kullanılıyor.\n',
     'Tangent to steep walls (bullet shape)':
         'Dik duvarlara teğet (mermi biçimi)',
     'Off: a smooth bump with a free slope at steep walls':

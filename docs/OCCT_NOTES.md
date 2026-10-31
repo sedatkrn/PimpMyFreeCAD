@@ -134,3 +134,7 @@ unsaved work can be lost. `doc.saveCopy(path)` gets a user's geometry out withou
   averaged direction, or they leave a gap. Project the blended direction back into the wall on curved walls.
 - A Pad with `TaperAngle` on a curved sketch (8 B-spline wall faces) passes `isValid()` but its STEP round trip returned 3 of
   10 faces and no solid, with no dome involved. Always round-trip the base when a result fails.
+- Patches of a dome must share ridge poles exactly: a 6e-6 mm difference left the shell open and the solid invalid, and
+  `sewShape` with a larger tolerance did not close it. Compute each shared end once.
+- A fillet along the sharp rim of the smooth bump is uneven: the rim angle runs 13-38 degrees and peaks at line/arc joints, and
+  the fillet edges jog there (2.2 degrees per 0.25 mm, against an even 0.45 on a flat top).

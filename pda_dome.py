@@ -383,7 +383,7 @@ def _rational_basis(cv, ts):
     return R / R.sum(axis=1)[:, None]
 
 
-def _wall_row(cv, f, n, height, sign, span, c0, c1):
+def _wall_row(cv, f, n, height, sign, span, c0, c1, joints):
     """Orta sira kontrol noktalari: kenarin her noktasi duvar boyunca tepe duzlemine cikar. Yuzeyin kenardaki tegeti bu
     yondedir. Duz duvarda iki kose yonu arasinda dogrusal kalir, bu yuzden duvar duzleminden cikmaz."""
     a, b = span
@@ -405,9 +405,16 @@ def _wall_row(cv, f, n, height, sign, span, c0, c1):
         Q.append(tuple(p + d * (sign * height / d.dot(n))))
     Q = np.array(Q)
     R = _rational_basis(cv, ts)
-    W = np.ones(len(ts))
-    W[[0, -1]] = 1e4                                       # komsu yamalarla ayni uc
-    sol = np.linalg.lstsq(R * W[:, None], Q * W[:, None], rcond=None)[0]
+    # uclar tam: komsu yamayla sirt ayni olmali. Yaklasik uc (agirlikli en kucuk kareler) dikisi tutmuyor, kati gecersiz
+    # kaliyordu (yay + duz kenarli yuzde 4 sirt acik)
+    # Ayni yay parcalarinda koni normali de 6e-6 mm fark veriyordu: ortak uc bir kez hesaplanir.
+    for k in (0, -1):
+        Q[k] = joints.setdefault(tuple(np.round(tuple(cv.value(float(ts[k]))), 5)), Q[k])
+    sol = np.zeros((R.shape[1], 3))
+    sol[0], sol[-1] = Q[0], Q[-1]
+    if R.shape[1] > 2:
+        rhs = Q - R[:, 0:1] * sol[0] - R[:, -1:] * sol[-1]
+        sol[1:-1] = np.linalg.lstsq(R[:, 1:-1], rhs, rcond=None)[0]
     return [V(*(float(x) for x in r)) for r in sol], float(np.abs(R.dot(sol) - Q).max())
 
 
@@ -420,13 +427,14 @@ def ellipse_patches(face, shape, center, height, sign):
     corners = _corner_dirs(face, shape, n)
     apex = center + n * (sign * height)
     weights = (1.0, float(np.sqrt(0.5)), 1.0)
+    joints = {}
     out = []
     for i, e in enumerate(face.Edges):
         f = neighbour(shape, e, face)
         span = (e.FirstParameter, e.LastParameter)
         for cv in _smooth_spans(e):
             for _ in range(4):                             # egimli duvarda orta sira egrinin tabanina sigmayabilir: dugum ekle
-                mid, err = _wall_row(cv, f, n, height, sign, span, corners.get((i, 0)), corners.get((i, 1)))
+                mid, err = _wall_row(cv, f, n, height, sign, span, corners.get((i, 0)), corners.get((i, 1)), joints)
                 if err < ROW_TOL * max(height, 1.0):
                     break
                 k = cv.getKnots()
@@ -639,8 +647,10 @@ class Dome:
             raise RuntimeError(T("Dome: the height must be above zero"))
         sign = -1.0 if obj.Reversed else 1.0
         center = can_ellipse(face, base) if obj.Elliptical else None
-        if center is not None and self.ellipse(obj, base, face, center, height, sign):
-            return
+        if center is not None:
+            if self.ellipse(obj, base, face, center, height, sign):
+                return
+            App.Console.PrintWarning(T("Dome: can't follow the walls here, using a smooth bump with sharp edges.\n"))
         # kopya: pcurve ve tolerans kenarlara yerinde yazilir, onceki adimin sekli bozulmasin (Rail Pipe'taki gibi)
         work = base.copy()
         wface = work.Faces[next(i for i, f in enumerate(base.Faces) if f.isSame(face))]
