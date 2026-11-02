@@ -80,6 +80,10 @@ Limits: a **corner-to-round** transition (hexagon to circle) gets no wall from P
 the feature warns about it. Cut the inside with a Magic Loft Cut from inset profiles instead. Close loft, a centerline,
 curvature (G2) ends and open profiles are not available.
 
+**Section smoothing:** a line-to-arc joint is tangent, but its curvature jumps, and the one-piece surface ripples around it (Zebra
+shows this as corners in the stripes). *Section smoothing* in the panel filters such a profile, up to the deviation you set. At 0 the
+sketch is followed exactly. Circles, single curves and profiles with sharp corners do not change.
+
 ## Dome
 
 <p>
@@ -122,6 +126,10 @@ The *Matcap* drop-down button shows Part and PartDesign shapes in a Clay, Plasti
 the look off. It is display only: the document does not change and STEP export is not affected. The choice comes back after a
 restart. A matcap replaces the object's own colour; selected and preselected faces still show FreeCAD's highlight colours.
 Meshes are not included.
+
+The same button has two analysis views. *Zebra* shows reflection stripes, which break at a kink. *Draft analysis* opens a small
+window for the pull direction and minimum draft, and colours faces by their angle: green has enough draft, yellow too little, red
+is an undercut.
 
 ## Installation
 
@@ -172,10 +180,15 @@ otomatik rehberler oluşur ve ekranda düzenlenir, seçili rehberler saklanır a
 dik* ya da *Yüzeye teğet* olabilir. Yeşil connector noktaları burulmayı düzeltir, *Zebra* yüzey kalitesini gösterir.
 Köşeliden yuvarlağa geçişte PartDesign Thickness et vermez; içini Sihirli Loft Oyma ile boşaltın.
 
+**Kesit yumuşatma:** doğru-yay birleşimi teğettir ama eğriliği bir anda değişir; tek parça yüzey orada dalgalanır (Zebra'da şeritlerde
+köşe olarak görünür). Paneldeki *Kesit yumuşatma* böyle bir kesiti verdiğiniz sapma kadar süzer; 0 sketch'i tam izler. Daire, tek eğri ve
+köşeli kesit değişmez.
+
 **Kubbe (Dome):** bir Body'nin düz yüzünü seçip düğmeye basın, *Yükseklik* verin; yüz, kenarlarda komşu yüzlere teğet bir
 kubbeye dönüşür, *Ters* katının içine oyar. Çevresi duvarsa kubbe duvarın kendi eğimiyle teğet başlar (mermi biçimi; eğimli
 Pad ve pah da olur), keskin köşeler tepeye sırt olarak gider. Fillet'li kenarda düz başlar; iç bükey çizgi ve delikli yüz de çalışır.
 
 **Matcap:** açılır düğmeden Part ve PartDesign şekilleri için Kil, Plastik, Siyah plastik, Seramik ya da Metal görünümünü seçin
 veya kapatın. Yalnız görünümdür, belge ve STEP değişmez; seçim yeniden başlatınca geri gelir. Nesnenin kendi rengi görünmez, seçim
-ve ön seçim renkleri görünür. Mesh nesneleri kapsam dışıdır.
+ve ön seçim renkleri görünür. Mesh nesneleri kapsam dışıdır. Aynı düğmede iki analiz görünümü var: *Zebra* yansıma şeritlerini gösterir,
+*Kalıp açısı analizi* açılma yönü ve en küçük açı penceresini açar; yeşil açı yeterli, sarı az, kırmızı ters açıdır.

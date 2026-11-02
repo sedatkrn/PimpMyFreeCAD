@@ -59,10 +59,18 @@ TR = {
         'Seramik',
     'Metal':
         'Metal',
-    'Show shapes in this matcap look; display only, the document does not change':
-        'Şekilleri bu matcap görünümüyle gösterir; yalnız görünümdür, belge değişmez',
-    'Matcap view of Part and PartDesign shapes: choose a look or turn it off':
-        'Part ve PartDesign şekillerinde matcap görünümü: bir tür seçin ya da kapatın',
+    'Show shapes in this look; display only, the document does not change':
+        'Şekilleri bu görünümle gösterir; yalnız görünümdür, belge değişmez',
+    'Matcap, zebra or draft view of Part and PartDesign shapes: choose one or turn it off':
+        'Part ve PartDesign şekillerinde matcap, zebra ya da kalıp açısı görünümü: birini seçin ya da kapatın',
+    'Draft analysis':
+        'Kalıp açısı analizi',
+    'Pull direction':
+        'Açılma yönü',
+    'Minimum draft':
+        'En küçük açı',
+    'Green: enough draft. Yellow: too little. Red: undercut':
+        'Yeşil: açı yeterli. Sarı: açı az. Kırmızı: ters açı',
     'Dome':
         'Kubbe',
     'Edit Dome':
@@ -183,6 +191,10 @@ TR = {
         'Oturtma toleransı',
     'Largest deviation of the surface fit: smaller is more exact, larger has fewer control points':
         'Yüzey oturtmasının en büyük sapması: küçük değer daha hassas, büyük değer daha az kontrol noktası',
+    'Section smoothing':
+        'Kesit yumuşatma',
+    'Smooths line-to-arc joints in a profile, up to this deviation from the sketch; 0 follows it exactly':
+        'Kesitteki doğru-yay birleşimlerini, sketch\'ten en fazla bu kadar sapacak şekilde yumuşatır; 0 sketch\'i tam izler',
     'Add point':
         'Nokta ekle',
     'Click a guide point in the 3D view and move it with the gizmo (arrows: along an axis, squares: in a plane, cube: free) or drag the point itself. The white end points belong to the profiles and stay put. Click the curve to pick a span: Add point puts the new point where you clicked.':

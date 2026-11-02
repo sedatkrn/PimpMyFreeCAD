@@ -150,6 +150,30 @@ class Section(object):
         self.n = np.cross(d, np.roll(d, -1, axis=0)).sum(axis=0)
         self.n /= max(np.linalg.norm(self.n), 1e-12)
 
+    def smooth(self, limit):
+        """Dogru-yay gibi teget birlesimlerde egrilik sicrar; tek parca C2 yuzey orada dalgalaniyordu (looft-test2: orta
+        kesitte kucuk egrilik 12 kez isaret degistirdi). Kesit, en fazla limit mm sapacak kadar genis Gauss ile suzulur.
+        Tek kenarli kesit (daire, spline) ve koseli kesit degismez: daire yalniz kuculurdu, kose yuvarlanirdi."""
+        if limit <= 0 or self.corners or len(self.wire.OrderedEdges) < 2:
+            return
+        N = len(self.P) - 1
+        q = np.arange(N) / float(N)
+        P0 = np.stack([np.interp(q, self.s, self.P[:, k]) for k in range(3)], axis=-1)
+        F = np.fft.rfft(P0, axis=0)
+        f = np.fft.rfftfreq(N)
+        blur = lambda w: np.fft.irfft(F * np.exp(-2 * (math.pi * f * w) ** 2)[:, None], n=N, axis=0)
+        lo, hi = 0.0, N / 8.0
+        for _ in range(16):
+            mid = (lo + hi) / 2
+            if np.linalg.norm(blur(mid) - P0, axis=1).max() <= limit:
+                lo = mid
+            else:
+                hi = mid
+        Q = blur(lo)
+        self.P = np.vstack([Q, Q[:1]])
+        L = np.linalg.norm(np.diff(self.P, axis=0), axis=1)
+        self.s = np.concatenate([[0.0], np.cumsum(L)]) / L.sum()
+
     def flip(self):
         self.P, self.s = self.P[::-1].copy(), 1.0 - self.s[::-1]
         self.corners = [(1.0 - c) % 1.0 for c in self.corners]
@@ -334,6 +358,8 @@ class Skin(object):
         self.card = None
         self.spread = 1.0
         self.S = self.A = None
+        self.nu = None                                     # periyodik yuzeyin u kontrol noktasi; koseli yuzeyde None
+        self.min_nu = 0
         self._match()
 
     # kose eslestirme: en cok koseli kesit referans; obur koseler en yakin kirilmaya baglanir
@@ -556,6 +582,8 @@ class Skin(object):
     def _periodic_poles(self, Nv):
         """Periyodik yuzey: sapma toleransin altina inene dek u yonunde kontrol noktasi artar."""
         for Nu in (24, 32, 48, 64, 96, 128):
+            if Nu <= self.min_nu and Nu < 128:
+                continue
             inv, half = _periodic_inv(Nu)
             uk = np.arange(Nu) / float(Nu)
             P = np.einsum("ij,jqa->iqa", inv, self.grid(uk, self._check_v()))
@@ -563,6 +591,7 @@ class Skin(object):
                                  axis=2).max()
             if err <= self.tol:
                 break
+        self.nu = Nu
         gnorm, gv = self._gv(Nv)
         return Nu, np.einsum("ij,jqa->iqa", inv, self.grid(uk, gv)), gnorm
 
@@ -707,6 +736,7 @@ def prepare(obj):
         p = _on_body(p, base)
         profs.append(p)
         secs.append(Section(p))
+        secs[-1].smooth(float(getattr(obj, "SectionSmoothing", 0.0)))
     for a, b in zip(secs, secs[1:]):
         if np.linalg.norm(a.c - b.c) < 1e-6:
             return T("Magic Loft: two profiles are on top of each other")
@@ -847,6 +877,9 @@ def spread_prop(obj):
         obj.addProperty("App::PropertyFloat", "GuideSpread", "Loft",
                         "How far a guide acts sideways: larger gives a broader, smoother surface between guides")
         obj.GuideSpread = 1.0
+    if "SectionSmoothing" not in obj.PropertiesList:
+        obj.addProperty("App::PropertyLength", "SectionSmoothing", "Loft",
+                        "Smooths line-to-arc joints in a profile, up to this deviation from the sketch; 0 follows it exactly")
 
 
 class MagicLoft:
@@ -890,23 +923,29 @@ class MagicLoft:
         sk = prepare(obj)
         if isinstance(sk, str):
             raise RuntimeError(sk)
-        try:
-            tool = sk.solid()
-        except Exception as e:
-            raise RuntimeError(T("Magic Loft: the surface failed (%s)") % e)
-        if not tool.isValid():
-            raise RuntimeError(T("Magic Loft: the surface gave an invalid solid"))
         sub = obj.TypeId == "PartDesign::FeatureSubtractivePython"
-        # kesit uyumu ~0.02 mm: uc, katinin kenarina neredeyse degiyor. Toleranssiz boolean gecersiz ya da 20 yuzlu sonuc
-        # verip 10 kat yavasliyordu (daire ucu silindir uzerinde: 500 ms, 32 yuz); 1e-3 ile 40 ms, 4 yuz, Thickness gecer.
-        res = None
-        for fuzzy in (1e-3, 0.01, 0.05, 0.0):
+        for attempt in range(3):
             try:
-                res = rp._combine(_base(obj), tool, sub, getattr(obj, "Refine", False), fuzzy)
-            except Exception:
-                res = None
-            if res is not None and res[1]:
+                tool = sk.solid()
+            except Exception as e:
+                raise RuntimeError(T("Magic Loft: the surface failed (%s)") % e)
+            if not tool.isValid():
+                raise RuntimeError(T("Magic Loft: the surface gave an invalid solid"))
+            # kesit uyumu ~0.02 mm: uc, katinin kenarina neredeyse degiyor. Toleranssiz boolean gecersiz ya da 20 yuzlu sonuc
+            # verip 10 kat yavasliyordu (daire ucu silindir uzerinde: 500 ms, 32 yuz); 1e-3 ile 40 ms, 4 yuz, Thickness gecer.
+            res = None
+            for fuzzy in (1e-3, 0.01, 0.05, 0.0):
+                try:
+                    res = rp._combine(_base(obj), tool, sub, getattr(obj, "Refine", False), fuzzy)
+                except Exception:
+                    res = None
+                if res is not None and res[1]:
+                    break
+            # looft-test2: 48 kontrol noktali yuzeyde fuse tabani sessizce dusurdu (yalniz arac hacmi), 32 ve 64 temiz.
+            # Nedeni bilinmiyor: yuzey ayni sapma sinirinda daha cok noktayla yeniden kurulur.
+            if res is not None or sk.nu is None:
                 break
+            sk.min_nu = sk.nu
         if res is None:
             raise RuntimeError(T("Magic Loft: the boolean with the Body failed"))
         if sk.corner_mismatch and getattr(self, "warned", None) != obj.Name:

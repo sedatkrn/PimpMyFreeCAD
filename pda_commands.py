@@ -248,7 +248,8 @@ class _OwnBody:
 
 
 MATCAPS = (("", "off", "Matcap off"), ("Clay", "clay", "Clay"), ("Plastic", "plastic", "Plastic"),
-           ("Black plastic", "black", "Black plastic"), ("Ceramic", "ceramic", "Ceramic"), ("Metal", "metal", "Metal"))
+           ("Black plastic", "black", "Black plastic"), ("Ceramic", "ceramic", "Ceramic"), ("Metal", "metal", "Metal"),
+           ("Zebra", "zebra", "Zebra"), ("Draft", "draft", "Draft analysis"))
 
 
 def _matcap_setting():
@@ -264,7 +265,7 @@ class _MatcapChoice:
 
     def GetResources(self):
         return {"Pixmap": os.path.join(ICONS, "pda_matcap_%s.svg" % self.icon), "MenuText": T(self.text),
-                "ToolTip": T("Show shapes in this matcap look; display only, the document does not change")}
+                "ToolTip": T("Show shapes in this look; display only, the document does not change")}
 
     def IsActive(self):
         return True
@@ -272,6 +273,8 @@ class _MatcapChoice:
     def Activated(self):
         import pda_matcap
         pda_matcap.set_matcap(self.name)
+        if self.name == pda_matcap.DRAFT:
+            pda_matcap.show_panel()
 
 
 class _MatcapMenu:
@@ -285,7 +288,7 @@ class _MatcapMenu:
 
     def GetResources(self):
         return {"MenuText": T("Matcap"), "DropDownMenu": True, "Exclusive": False,
-                "ToolTip": T("Matcap view of Part and PartDesign shapes: choose a look or turn it off")}
+                "ToolTip": T("Matcap, zebra or draft view of Part and PartDesign shapes: choose one or turn it off")}
 
     def IsActive(self):
         return True
