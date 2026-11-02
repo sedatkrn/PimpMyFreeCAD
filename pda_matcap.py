@@ -78,8 +78,10 @@ def _matcap_image(name, size=256):
     return (np.clip(rgb, 0, 1) * 255 + 0.5).astype(np.uint8).tobytes()
 
 
+# gl_ClipVertex: yoksa kesit duzlemleri (Sketcher View Section, Live Section) yuzleri kesmez, yalniz kenarlar kesilirdi
 VERT = ("varying vec3 vN; varying vec3 vC; void main(){ vC = gl_Color.rgb; "
-        "vN = gl_NormalMatrix * gl_Normal; gl_Position = ftransform(); }")
+        "vN = gl_NormalMatrix * gl_Normal; gl_ClipVertex = gl_ModelViewMatrix * gl_Vertex; "
+        "gl_Position = ftransform(); }")
 # FreeCAD secim / on secim rengini gl_Color'da verir (olculdu): renk tercihlerdeki vurgu rengine esitse yuz o renkle
 # boyanir, parlaklik sekli gostermeye devam eder; yoksa secim gorunmezdi.
 HIGHLIGHT = ("if (distance(vC, sel) < 0.02 || distance(vC, pre) < 0.02) "

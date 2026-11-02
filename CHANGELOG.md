@@ -1,7 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 (2026-11-02)
 
+- Matcap, Zebra and Draft views: section planes (Sketcher View Section, section tools) now cut the faces too. Only the
+  edges were cut, so the whole part stayed on screen.
 - Renamed to **Pimp My FreeCAD**, since the tools also work in the Part workbench. Saved documents and settings are not
   affected: the `pda_` modules, command names, the workbench class and `Preferences/Mod/PimpMyPartDesign` keep their names.
 - New **STEP check** button: reports whether selected shapes are valid and closed, their tolerances and very short edges, and compares
