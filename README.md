@@ -131,6 +131,12 @@ The same button has two analysis views. *Zebra* shows reflection stripes, which 
 window for the pull direction and minimum draft, and colours faces by their angle: green has enough draft, yellow too little, red
 is an undercut.
 
+## STEP check
+
+Select one or more shapes and press *STEP check*. The window reports whether each is valid and closed, its largest tolerance, very
+short edges, and what comes back after a test export: solids, faces, edges, volume and bounding box. The shapes do not change, and the
+temporary STEP file is deleted. A strict-check warning can appear on a sound solid that still exports correctly.
+
 ## Installation
 
 **Addon Manager (custom repository)**
@@ -183,6 +189,9 @@ Köşeliden yuvarlağa geçişte PartDesign Thickness et vermez; içini Sihirli 
 **Kesit yumuşatma:** doğru-yay birleşimi teğettir ama eğriliği bir anda değişir; tek parça yüzey orada dalgalanır (Zebra'da şeritlerde
 köşe olarak görünür). Paneldeki *Kesit yumuşatma* böyle bir kesiti verdiğiniz sapma kadar süzer; 0 sketch'i tam izler. Daire, tek eğri ve
 köşeli kesit değişmez.
+
+**STEP kontrolü:** şekilleri seçip düğmeye basın. Pencere geçerlilik, kapalılık, en büyük tolerans, çok kısa kenarlar ve deneme aktarımından
+dönen katı, yüz, kenar, hacim ve sınır kutusunu raporlar. Şekiller değişmez, geçici dosya silinir.
 
 **Kubbe (Dome):** bir Body'nin düz yüzünü seçip düğmeye basın, *Yükseklik* verin; yüz, kenarlarda komşu yüzlere teğet bir
 kubbeye dönüşür, *Ters* katının içine oyar. Çevresi duvarsa kubbe duvarın kendi eğimiyle teğet başlar (mermi biçimi; eğimli

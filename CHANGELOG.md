@@ -4,6 +4,8 @@
 
 - Renamed to **Pimp My FreeCAD**, since the tools also work in the Part workbench. Saved documents and settings are not
   affected: the `pda_` modules, command names, the workbench class and `Preferences/Mod/PimpMyPartDesign` keep their names.
+- New **STEP check** button: reports whether selected shapes are valid and closed, their tolerances and very short edges, and compares
+  them with what a test STEP export reads back. The shapes do not change.
 - Magic Loft **Section smoothing**: filters line-to-arc joints in a profile up to a set deviation, against the ripple they cause
   in the surface. Off (0) by default, so saved features keep their shape.
 - Magic Loft: when the boolean with the Body fails on a one-piece surface, the surface is rebuilt with more control points. On a

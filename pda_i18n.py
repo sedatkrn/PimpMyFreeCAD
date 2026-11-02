@@ -45,6 +45,74 @@ def T(text):
 
 
 TR = {
+    "the check failed":
+        "denetim başarısız",
+    "STEP check":
+        "STEP kontrolü",
+    "Check the selected shapes for STEP export: valid, closed, tolerances, and what comes back after a test export. The shapes do not change":
+        "Seçili şekilleri STEP için denetler: geçerlilik, kapalılık, toleranslar ve deneme aktarımından dönen sonuç. Şekiller değişmez",
+    "STEP check: select a shape first.\n":
+        "STEP kontrolü: önce bir şekil seçin.\n",
+    "Check":
+        "Denetim",
+    "Result":
+        "Sonuç",
+    "Details":
+        "Ayrıntı",
+    "OK":
+        "Tamam",
+    "Info":
+        "Bilgi",
+    "Warning":
+        "Uyarı",
+    "Error":
+        "Hata",
+    "Shape":
+        "Şekil",
+    "no faces to export":
+        "aktarılacak yüz yok",
+    "Valid shape":
+        "Geçerli şekil",
+    "yes":
+        "evet",
+    "no":
+        "hayır",
+    "Strict check":
+        "Sıkı denetim",
+    "no problems":
+        "sorun yok",
+    "Solids":
+        "Katılar",
+    "none: this is a surface, not a solid":
+        "yok: bu bir yüzey, katı değil",
+    "Closed":
+        "Kapalı",
+    "an open shell":
+        "açık kabuk var",
+    "Largest tolerance":
+        "En büyük tolerans",
+    "Very short edges":
+        "Çok kısa kenarlar",
+    "Faces":
+        "Yüzler",
+    "Export to STEP":
+        "STEP'e aktarım",
+    "Read back":
+        "Geri okuma",
+    "the shape read from STEP is not valid":
+        "STEP'ten okunan şekil geçerli değil",
+    "the shape read from STEP is valid":
+        "STEP'ten okunan şekil geçerli",
+    "Solids after STEP":
+        "STEP sonrası katılar",
+    "Faces after STEP":
+        "STEP sonrası yüzler",
+    "Edges after STEP":
+        "STEP sonrası kenarlar",
+    "Volume after STEP":
+        "STEP sonrası hacim",
+    "Bounding box after STEP":
+        "STEP sonrası sınır kutusu",
     'Matcap':
         'Matcap',
     'Matcap off':

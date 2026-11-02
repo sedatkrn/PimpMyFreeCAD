@@ -294,8 +294,28 @@ class _MatcapMenu:
         return True
 
 
+class _StepCheck:
+    """STEP kontrolu: secili kati disa aktarmaya uygun mu (pda_stepcheck). Sekle dokunmaz."""
+
+    def GetResources(self):
+        return {"Pixmap": os.path.join(ICONS, "pda_stepcheck.svg"), "MenuText": T("STEP check"),
+                "ToolTip": T("Check the selected shapes for STEP export: valid, closed, tolerances, and what comes back "
+                             "after a test export. The shapes do not change")}
+
+    def IsActive(self):
+        return App.ActiveDocument is not None
+
+    def Activated(self):
+        objs = [o for o in Gui.Selection.getSelection() if getattr(o, "Shape", None) is not None]
+        if not objs:
+            App.Console.PrintWarning(T("STEP check: select a shape first.\n"))
+            return
+        import pda_stepcheck
+        pda_stepcheck.show(objs)
+
+
 COMMANDS = ["PDA_RailPipe", "PDA_RailGroove", "PDA_MagicLoft", "PDA_MagicLoftCut", "PDA_Dome"]
-OPTIONS = ["PDA_RailPipeOwnBody", "PDA_Matcap"]
+OPTIONS = ["PDA_RailPipeOwnBody", "PDA_Matcap", "PDA_StepCheck"]
 
 Gui.addCommand("PDA_RailPipe", _RailPipe(False))
 Gui.addCommand("PDA_RailGroove", _RailPipe(True))
@@ -306,3 +326,4 @@ Gui.addCommand("PDA_RailPipeOwnBody", _OwnBody())
 for _m in MATCAPS:
     Gui.addCommand("PDA_Matcap_" + _m[1], _MatcapChoice(*_m))
 Gui.addCommand("PDA_Matcap", _MatcapMenu())
+Gui.addCommand("PDA_StepCheck", _StepCheck())
