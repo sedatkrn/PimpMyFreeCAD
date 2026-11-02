@@ -35,17 +35,13 @@ class _PartDesignTools:
     disinda kendi basina kati)."""
 
     def modifyToolBars(self):
-        try:
-            wb = Gui.activeWorkbench().name()
-        except Exception:
-            return []
+        # Workbench'e bakilmaz: ilk etkinlesmede activeWorkbench() hata veriyor (olculdu). Arac cubugu adlari tek
+        # workbench'te var, olmayan cubuga ekleme atlanir.
         import pda_commands
-        if wb == "PartDesignWorkbench":
-            return [{"append": c, "toolBar": "Part Design Modeling Features"}
-                    for c in pda_commands.COMMANDS + pda_commands.OPTIONS]
-        if wb == "PartWorkbench":                          # ("insert" + "toolItem": Part_Sweep yerlesmiyordu)
-            return [{"append": c, "toolBar": "Part Tools"} for c in ("PDA_RailPipe", "PDA_MagicLoft")]
-        return []
+        return ([{"append": c, "toolBar": "Part Design Modeling Features"}
+                 for c in pda_commands.COMMANDS + pda_commands.OPTIONS]
+                + [{"append": c, "toolBar": "Part Tools"}          # ("insert" + "toolItem": Part_Sweep yerlesmiyordu)
+                   for c in ("PDA_RailPipe", "PDA_MagicLoft", "PDA_Matcap")])
 
 
 class _RestoreObserver:
@@ -81,6 +77,9 @@ class _RestoreObserver:
                for o in doc.Objects):
             import pda_dome
             pda_dome.repair_proxies(doc)
+        if App.ParamGet("User parameter:BaseApp/Preferences/Mod/PimpMyPartDesign").GetString("Matcap", ""):
+            import pda_matcap                              # son secilen gorunum; kapaliyken modul yuklenmez
+            pda_matcap.restore()
 
 
 import FreeCAD as App

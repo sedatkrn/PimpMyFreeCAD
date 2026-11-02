@@ -116,6 +116,13 @@ Limits:
 - **Collisions:** a smooth bump that runs into another part of the solid falls back to a real boolean, which takes seconds.
 - **Not available:** a peak moved off-centre with a point, and domes on curved faces.
 
+## Matcap
+
+The *Matcap* drop-down button shows Part and PartDesign shapes in a Clay, Plastic, Black plastic, Ceramic or Metal look, or turns
+the look off. It is display only: the document does not change and STEP export is not affected. The choice comes back after a
+restart. A matcap replaces the object's own colour; selected and preselected faces still show FreeCAD's highlight colours.
+Meshes are not included.
+
 ## Installation
 
 **Addon Manager (custom repository)**
@@ -168,3 +175,7 @@ Köşeliden yuvarlağa geçişte PartDesign Thickness et vermez; içini Sihirli 
 **Kubbe (Dome):** bir Body'nin düz yüzünü seçip düğmeye basın, *Yükseklik* verin; yüz, kenarlarda komşu yüzlere teğet bir
 kubbeye dönüşür, *Ters* katının içine oyar. Çevresi duvarsa kubbe duvarın kendi eğimiyle teğet başlar (mermi biçimi; eğimli
 Pad ve pah da olur), keskin köşeler tepeye sırt olarak gider. Fillet'li kenarda düz başlar; iç bükey çizgi ve delikli yüz de çalışır.
+
+**Matcap:** açılır düğmeden Part ve PartDesign şekilleri için Kil, Plastik, Siyah plastik, Seramik ya da Metal görünümünü seçin
+veya kapatın. Yalnız görünümdür, belge ve STEP değişmez; seçim yeniden başlatınca geri gelir. Nesnenin kendi rengi görünmez, seçim
+ve ön seçim renkleri görünür. Mesh nesneleri kapsam dışıdır.

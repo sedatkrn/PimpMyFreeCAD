@@ -45,6 +45,24 @@ def T(text):
 
 
 TR = {
+    'Matcap':
+        'Matcap',
+    'Matcap off':
+        'Matcap kapalı',
+    'Clay':
+        'Kil',
+    'Plastic':
+        'Plastik',
+    'Black plastic':
+        'Siyah plastik',
+    'Ceramic':
+        'Seramik',
+    'Metal':
+        'Metal',
+    'Show shapes in this matcap look; display only, the document does not change':
+        'Şekilleri bu matcap görünümüyle gösterir; yalnız görünümdür, belge değişmez',
+    'Matcap view of Part and PartDesign shapes: choose a look or turn it off':
+        'Part ve PartDesign şekillerinde matcap görünümü: bir tür seçin ya da kapatın',
     'Dome':
         'Kubbe',
     'Edit Dome':

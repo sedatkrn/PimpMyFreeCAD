@@ -4,6 +4,9 @@
 
 - Renamed to **Pimp My FreeCAD**, since the tools also work in the Part workbench. Saved documents and settings are not
   affected: the `pda_` modules, command names, the workbench class and `Preferences/Mod/PimpMyPartDesign` keep their names.
+- New **Matcap** drop-down button: Clay, Plastic, Black plastic, Ceramic or Metal look for Part and PartDesign shapes, or off.
+  Display only: nothing is written to the document, the choice comes back after a restart, and off restores the original
+  view. Selected and preselected faces keep FreeCAD's highlight colours; edges and points are not affected.
 
 - New **Dome**: select a flat face, set a height, and the face rises into a cap that meets its edges tangent to the
   neighbouring faces; *Reversed* cuts it into the solid instead. On a filleted 80 x 50 top at 4 mm: tangent error 0.0004

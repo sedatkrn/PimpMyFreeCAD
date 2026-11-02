@@ -247,8 +247,52 @@ class _OwnBody:
         set_own_body(bool(checked) if checked is not None else not own_body())
 
 
+MATCAPS = (("", "off", "Matcap off"), ("Clay", "clay", "Clay"), ("Plastic", "plastic", "Plastic"),
+           ("Black plastic", "black", "Black plastic"), ("Ceramic", "ceramic", "Ceramic"), ("Metal", "metal", "Metal"))
+
+
+def _matcap_setting():
+    import pda_common
+    return pda_common._param().GetString("Matcap", "")
+
+
+class _MatcapChoice:
+    """Matcap acilir dugmesinin bir satiri: gorunum turu ya da kapali (pda_matcap)."""
+
+    def __init__(self, name, icon, text):
+        self.name, self.icon, self.text = name, icon, text
+
+    def GetResources(self):
+        return {"Pixmap": os.path.join(ICONS, "pda_matcap_%s.svg" % self.icon), "MenuText": T(self.text),
+                "ToolTip": T("Show shapes in this matcap look; display only, the document does not change")}
+
+    def IsActive(self):
+        return True
+
+    def Activated(self):
+        import pda_matcap
+        pda_matcap.set_matcap(self.name)
+
+
+class _MatcapMenu:
+    """Arac cubugunda acilir dugme: son secilen gorunumu gosterir."""
+
+    def GetCommands(self):
+        return tuple("PDA_Matcap_" + m[1] for m in MATCAPS)
+
+    def GetDefaultCommand(self):
+        return next((i for i, m in enumerate(MATCAPS) if m[0] == _matcap_setting()), 0)
+
+    def GetResources(self):
+        return {"MenuText": T("Matcap"), "DropDownMenu": True, "Exclusive": False,
+                "ToolTip": T("Matcap view of Part and PartDesign shapes: choose a look or turn it off")}
+
+    def IsActive(self):
+        return True
+
+
 COMMANDS = ["PDA_RailPipe", "PDA_RailGroove", "PDA_MagicLoft", "PDA_MagicLoftCut", "PDA_Dome"]
-OPTIONS = ["PDA_RailPipeOwnBody"]
+OPTIONS = ["PDA_RailPipeOwnBody", "PDA_Matcap"]
 
 Gui.addCommand("PDA_RailPipe", _RailPipe(False))
 Gui.addCommand("PDA_RailGroove", _RailPipe(True))
@@ -256,3 +300,6 @@ Gui.addCommand("PDA_MagicLoft", _MagicLoft(False))
 Gui.addCommand("PDA_MagicLoftCut", _MagicLoft(True))
 Gui.addCommand("PDA_Dome", _Dome())
 Gui.addCommand("PDA_RailPipeOwnBody", _OwnBody())
+for _m in MATCAPS:
+    Gui.addCommand("PDA_Matcap_" + _m[1], _MatcapChoice(*_m))
+Gui.addCommand("PDA_Matcap", _MatcapMenu())
