@@ -1018,7 +1018,6 @@ def _loft_tool(spine, wa, wb, size):
         inv = F[-1][2].inverted()                          # B'nin sekli, oraya tasinan cercevede
         pa = [sample_a(j) - ca for j in range(M)]
         pb = [inv.multVec(sample_b(j) - cb) for j in range(M)]
-    closed1 = len(ea_) == 1 and ea_[0].isClosed() and eb_[0].isClosed()
     secs = [wa]
     for i in range(1, K):
         c, t, R = F[i]
@@ -1097,6 +1096,7 @@ def _rmf_blend(spine, wa, wb, size):
                 if best is None or d < best[0]:
                     best = (d, r)
         B[0] = best[1] + [best[1][0]]
+    closed1 = len(ea_) == 1 and ea_[0].isClosed() and eb_[0].isClosed()
     secs = [wa]
     for i in range(1, K):
         c, t, R = F[i]
