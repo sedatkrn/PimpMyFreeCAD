@@ -820,29 +820,48 @@ def build_tools(obj):
             yield "Rail Pipe: the wall is too thick for the profile"
             return
     cuts = ([(inner[0], inner[1], None)] if inner is not None else []) + holes
-    given = False
-    for spec in specs:
+    # C1 yaklasimi hedef toleransi tutturamazsa (olculdu: 3B kilavuzda kivrimda kenar toleransi 0.37 mm, hacim 0.025 %
+    # eksik, yuzey dalgali, STEP kontrolu 'Largest tolerance' hatasi) yuzey yine de C1 verir ama dogru degildir; C1'siz
+    # sonuc ayni kilavuzda 0.0002 mm cikti. Bu yuzden kotu C1 sonucu sona ertelenir (ofset / Thickness yine mumkun kalsin
+    # diye tamamen atilmaz): once saglam denemeler, hicbiri tutmazsa ertelenenler.
+    tol_ok = 0.01 + 1e-4 * size
+
+    def finish(spec, gate):
         tool = make(spec, wa, wb)
         if tool is None:
-            continue
-        ok = True
+            return None
+        if gate and spec[3] and max(e.Tolerance for e in tool.Edges) > tol_ok:
+            return "soft"
         for a_, b_, pr in cuts:                            # ayni yontemle ic boru / delik borulari, dis borudan cikar
             hole = make(spec, a_, b_, pr)
             if hole is None:
-                ok = False
-                break
+                return None
             try:
                 tool = tool.cut(hole)
             except Exception:
-                ok = False
-                break
+                return None
             if tool.isNull() or not tool.Solids or not tool.isValid():
-                ok = False
-                break
+                return None
             tool = tool.Solids[0] if len(tool.Solids) == 1 else tool
-        if not ok:
+        return tool
+
+    given = False
+    soft = []
+    for spec in specs:
+        tool = finish(spec, not PREVIEW)
+        if isinstance(tool, str):
+            soft.append(spec)
+            continue
+        if tool is None:
             continue
         LAST_MODE = spec[:3] if spec[0] != "loft" else ("loft", None, None)
+        yield tool
+        given = True
+    for spec in soft:
+        tool = finish(spec, False)
+        if tool is None:
+            continue
+        LAST_MODE = spec[:3]
         yield tool
         given = True
     if not given:
