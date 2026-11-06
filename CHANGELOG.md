@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0 (2026-11-06)
+
+- Rail Pipe / Rail Groove **Curve type**: Hermite (C1), Smooth (C2) or B-spline (control points) guide. **Tension** also works
+  with Smooth, and a second end angle, **End pitch**, tilts the free end out of the bend plane.
+- Rail Pipe / Rail Groove profiles with **holes**: sketch Make Internals and the inner wires of a face are swept and cut out.
+  The profile sketch is nested under the feature in the tree.
+- New rotation-minimizing (parallel-transport) loft sweep for 3D guides, for free-end and two-profile pipes. It removes the
+  twist and ripples of the Frenet sweep on non-planar guides and passes the strict STEP check. The old sweeps stay as fallback.
+- Smooth guide: no end loops or curvature spikes (interpolation without scaling).
+- C1-approximated sweeps that miss the tolerance are deferred, and the approximation is capped at 200 segments so a failed
+  try no longer takes minutes.
+- STEP check: fixed the strict BOPAlgo_InvalidCurveOnSurface warning on Rail Pipe results.
+
 ## 0.2.0 (2026-11-02)
 
 - Matcap, Zebra and Draft views: section planes (Sketcher View Section, section tools) now cut the faces too. Only the
