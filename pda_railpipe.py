@@ -20,6 +20,10 @@ V = App.Vector
 PROPS = "GuidePoints"     # bu ozellik varsa nesne Rail Pipe / Groove'dur (onarim, komutlar)
 PREVIEW = False           # ekranda surukleme sirasinda True: yavas (kaliteli) supurme yontemi atlanir
 LAST_MODE = None          # son supurmenin yontemi (tani)
+# C2 kilavuzda Tension 0 iken ek kirisa cekim (guide_smooth tension); Scale=False ile gerekmedi (0.3 en dar yaricapi azaltiyordu)
+SMOOTH_BASE = 0.0
+C1_APPROX = (3, 200, (1e-4, 1e-4, 1e-2))   # C1 yaklasim: en yuksek derece, en cok parca, (3B, sinir, aci) toleransi
+# 200 parca: tutan durumlarda 1000 ile ayni sonuc; tutmayan 3B kilavuzda (kenar toleransi 36 mm) basarisiz deneme 16 s -> 4 s
 LAST_BEND = None          # son kilavuz: (egri, A teli, A merkezi); hata metni icin
 
 
@@ -137,6 +141,78 @@ def profile(link, glob=False):
     return f.OuterWire, c, n, bool(sh.Solids)
 
 
+def _inner_loops(sh):
+    """Sekildeki kapali tellerden, en buyuk (dis) telin dogrudan icindekiler (delikler). Ic ice ucuncu kat (deligin
+    icindeki ada) atlanir: yalniz tam bir tel icinde olanlar delik sayilir."""
+    ws = [w for w in sh.Wires if w.isClosed()]
+    if len(ws) < 2:
+        return []
+    faces = []
+    for w in ws:
+        try:
+            faces.append(Part.Face(w))
+        except Exception:
+            faces.append(None)
+    outer = max(range(len(ws)), key=lambda i: ws[i].BoundBox.DiagonalLength)
+    if faces[outer] is None:
+        return []
+    holes = []
+    for i, w in enumerate(ws):
+        if i == outer or faces[i] is None:
+            continue
+        p = w.Vertexes[0].Point
+        depth = sum(1 for j, f in enumerate(faces) if j != i and f is not None and f.isInside(p, 1e-6, True))
+        if depth == 1 and faces[outer].isInside(p, 1e-6, True):
+            holes.append(w)
+    return holes
+
+
+def profile_holes(link, glob=False):
+    """profile()'in dis teline gore delikleri: kapali tel listesi (profille ayni koordinatta). Sketch: yalniz Make
+    Internals aciksa dis telin icindeki kapali teller; yuz: yuzun ic telleri; kenar secimi: yok."""
+    if not link or link[0] is None:
+        return []
+    o, subs = link[0], list(link[1] or [])
+    try:
+        if _is_sketch(o):
+            if not getattr(o, "MakeInternals", False):
+                return []
+            return _inner_loops(_shape(o, None, glob))
+        sh = _shape(o, None, glob)
+        if subs and subs[0].startswith("Edge"):
+            return []
+        f = None
+        if subs:
+            f = _shape(o, subs[0], glob)
+        elif len(sh.Faces) == 1:
+            f = sh.Faces[0]
+        elif not sh.Faces:                                 # yuzu olmayan teller (sketch'in Binder'i): sketch gibi
+            src = o.Support[0][0] if getattr(o, "Support", None) else None
+            if src is not None and _is_sketch(src) and not getattr(src, "MakeInternals", False):
+                return []
+            return _inner_loops(sh)
+        if f is None or f.ShapeType != "Face":
+            return []
+        return [w for w in f.Wires if not w.isSame(f.OuterWire)]
+    except Exception:
+        return []
+
+
+def _inside_pt(w):
+    """Kapali telin yuzunun icinde bir nokta (merkez disarida kalirsa, ornek noktalarindan biri)."""
+    f = Part.Face(w)
+    c = f.CenterOfMass
+    if f.isInside(c, 1e-6, True):
+        return c
+    u0, u1, v0, v1 = f.ParameterRange
+    for i in range(1, 8):
+        for j in range(1, 8):
+            q = f.Surface.value(u0 + (u1 - u0) * i / 8.0, v0 + (v1 - v0) * j / 8.0)
+            if f.isInside(q, 1e-6, True):
+                return q
+    return c
+
+
 def face_frame(f):
     """Yuzun merkezi ve (katinin disina bakan) normali."""
     c = f.CenterOfMass
@@ -189,6 +265,145 @@ def guide_spline(N, ta, tb=None, tension=0.0, ext_a=0.0, ext_b=0.0):
     for i in range(2, m):
         bs.removeKnot(i, 2, 1e-6 * max(knots[-1], 1.0))
     return bs
+
+
+def guide_smooth(N, ta, tb=None, ext_a=0.0, ext_b=0.0, tension=0.0):
+    """Duzgun (C2) kilavuz: dugumlerden kord boyu parametreyle gecen kubik interpolasyon B-spline. Hermite kilavuzun
+    (guide_spline) egriligi dugumlerde sicrar (yalniz C1); genis boruda ic kenar bu yuzden dugumlerde 'koseli' gorunur.
+    Burada egrilik surekli. Dugumler (N[i]) egrinin dugum degerleridir (ext_a / ext_b yoksa getKnots()[i] -> N[i]).
+    ta: A'dan cikis yonu; tb: B'ye giris (ya da serbest ucun) yonu, None: uc dogal. ext_a / ext_b: guide_spline'daki gibi
+    A'nin gerisinden / B'nin otesinden o kadar uzatma (yaklasik duz).
+    tension 0..1: egriyi kirisa (dugumleri birlestiren cokgene) cekerek aralik ortalarindaki 'gobek'i azaltir. Her
+    aralikta egrinin 1/3 ve 2/3 noktalari kirisin ayni noktalariyla tension kadar karistirilir, egri bu ek
+    noktalardan da gecerek yeniden enterpole edilir (hala C2). Olculdu: son aralikta kirisa sapma 25.6 mm ->
+    18.0 (0.3) -> 8.9 mm (1.0)."""
+    Q = list(N)
+    if ext_a > 0:
+        Q.insert(0, N[0] - ta * ext_a)
+    if ext_b > 0 and tb is not None:
+        Q.append(N[-1] + tb * ext_b)
+    prm = [0.0]
+    for i in range(len(Q) - 1):
+        prm.append(prm[-1] + (Q[i + 1] - Q[i]).Length)
+    flags = [True] + [False] * (len(Q) - 2) + [tb is not None]
+
+    def fit(P, par):
+        k = len(P)
+        tans = [V(ta)] + [V()] * (k - 2) + [V(tb) if tb is not None else V()]
+        fl = [True] + [False] * (k - 2) + [tb is not None]
+        # Scale=False: OCCT'nin tanjanti kendince olcekleyip uca yakin dongu yapmasi onlenir (olculdu: araliklar 336 / 387 /
+        # 908 mm'de en dar yaricap 1 mm; Scale=False 179 mm. Dort farkli kilavuzda 179-299 mm, Scale=True 1-167)
+        bs = Part.BSplineCurve()
+        bs.interpolate(Points=P, Parameters=par, Tangents=tans, TangentFlags=fl, Scale=False)
+        return bs
+
+    bs = fit(Q, prm)
+    k = min(max(float(tension), 0.0), 1.0)
+    if k <= 1e-9 or len(Q) < 3:
+        return bs
+    P2, par2 = [Q[0]], [prm[0]]
+    for i in range(len(Q) - 1):
+        for f in (1.0 / 3.0, 2.0 / 3.0):
+            u = prm[i] + (prm[i + 1] - prm[i]) * f
+            P2.append(bs.value(u) * (1.0 - k) + (Q[i] + (Q[i + 1] - Q[i]) * f) * k)
+            par2.append(u)
+        P2.append(Q[i + 1])
+        par2.append(prm[i + 1])
+    return fit(P2, par2)
+
+
+def guide_bspline(N, ta, tb=None, ext_a=0.0, ext_b=0.0):
+    """Kontrol noktali B-spline kilavuz: dugumler (N) kontrol cokgeninin kosesidir, egri aralarindan YAKINDAN gecer ama
+    ustunden gecmez (kontrol cokgeninin icinde kalir: 'gobek', asma ya da dongu yapmaz, C2). Egri A'nin merkezinden
+    (ext_a > 0: A'nin gerisinden) baslar, ta yonunde cikar; serbest uc N[-1]'de son kirisin yonunde biter, B yuzunde
+    tb yonunde girip B'nin otesinde (ext_b) biter. Ilk / son kontrol bacagi uzunlugu ilk / son kirisin 1/3'u."""
+    n = len(N)
+    d0 = (N[1] - N[0]).Length
+    dl = (N[-1] - N[-2]).Length
+    P = [N[0] - ta * ext_a if ext_a > 0 else V(N[0]), N[0] + ta * (d0 / 3.0)]
+    P += [V(p) for p in N[1:-1]]
+    if tb is not None:
+        P.append(N[-1] - tb * (dl / 3.0))
+        P.append(N[-1] + tb * ext_b if ext_b > 0 else V(N[-1]))
+    else:
+        P.append(V(N[-1]))
+    m = len(P)
+    deg = min(3, m - 1)
+    nk = m - deg + 1                                       # kapali (clamped) duzgun dugum vektoru
+    knots = [float(i) for i in range(nk)]
+    mults = [deg + 1] + [1] * (nk - 2) + [deg + 1]
+    bs = Part.BSplineCurve()
+    bs.buildFromPolesMultsKnots(P, mults, knots, False, deg)
+    return bs
+
+
+def guide_type(obj):
+    """'Hermite' (C1, Tension), 'Smooth' (C2 enterpolasyon) ya da 'BSpline' (kontrol noktali). Eski nesnelerde GuideType
+    yoktur: SmoothGuide'dan."""
+    gt = getattr(obj, "GuideType", None)
+    if gt in ("Hermite", "Smooth", "BSpline"):
+        return gt
+    return "Smooth" if getattr(obj, "SmoothGuide", False) else "Hermite"
+
+
+def guide_curve(obj, N, ta, tb=None, ext_a=0.0, ext_b=0.0):
+    """Nesnenin kilavuz egrisi (GuideType): B-spline, duzgun C2 enterpolasyon ya da eski Hermite (C1, Tension).
+    Olmazsa (tek aralik gibi uc durumlar) Hermite'e dusulur."""
+    gt = guide_type(obj)
+    if gt == "BSpline" and len(N) >= 2:
+        try:
+            return guide_bspline(N, ta, tb, ext_a, ext_b)   # serbest uc (tb None): son kirisin yonunde biter
+        except Exception:
+            pass
+    elif gt == "Smooth":
+        try:
+            if tb is None and len(N) >= 2 and (N[-1] - N[-2]).Length > 1e-9:
+                tb = (N[-1] - N[-2]).normalize()           # serbest uc: son araligin yonu (Hermite'teki gibi)
+            t = min(max(float(getattr(obj, "Tension", 0.0)), 0.0), 1.0)
+            return guide_smooth(N, ta, tb, ext_a, ext_b, SMOOTH_BASE + (1.0 - SMOOTH_BASE) * t)
+        except Exception:
+            pass
+    return guide_spline(N, ta, tb, float(getattr(obj, "Tension", 0.0)), ext_a, ext_b)
+
+
+def _end_angles(obj):
+    """(EndAngle, EndPitch) derece olarak."""
+    out = []
+    for name in ("EndAngle", "EndPitch"):
+        v = getattr(obj, name, 0.0) or 0.0
+        out.append(float(getattr(v, "Value", v)))
+    return out
+
+
+def _end_dir(obj, N, ta, tb):
+    """Serbest ucun yonu: tb verilmisse (B yuzu) aynen; yoksa son araligin yonu, once EndAngle sonra EndPitch (derece)
+    kadar dondurulmus. EndAngle: kilavuzun kivrilma duzleminde. Eksen: kilavuz duzlemselse duzlemin normali, degilse son
+    iki aralikin carpimi; isaret: pozitif aci kilavuzun son kivrildigi yone dogru daha cok kivirir. EndPitch: bu
+    duzlemden disari egim (pozitif: eksenin yonune). Ikisi 0: eski davranis (son aralikin yonu)."""
+    ang, pitch = _end_angles(obj)
+    if tb is not None or (abs(ang) < 1e-9 and abs(pitch) < 1e-9) or len(N) < 2:
+        return tb
+    d = N[-1] - N[-2]
+    if d.Length < 1e-9:
+        return tb
+    d.normalize()
+    prev = (N[-2] - N[-3]) if len(N) >= 3 else V(ta)
+    turn = prev.cross(d)                                   # son kivrilma yonu (kivrilma yoksa ~0)
+    ax = _plane_normal(N, d, 2e-3)                         # (neredeyse) duzlemsel kilavuz: kararli eksen
+    if ax is None:
+        ax = turn if turn.Length > 1e-6 * max(prev.Length, 1.0) else None
+    elif turn.Length > 1e-6 * max(prev.Length, 1.0) and ax.dot(turn) < 0:
+        ax = -ax                                           # pozitif: ayni yone daha cok
+    if ax is None or ax.Length < 1e-9:
+        ax = d.cross(V(1, 0, 0)) if abs(d.x) < 0.9 else d.cross(V(0, 1, 0))
+    ax.normalize()
+    if abs(ang) > 1e-9:
+        d = App.Rotation(ax, ang).multVec(d)
+    if abs(pitch) > 1e-9:
+        u = d.cross(ax)                                    # d'yi ax yonune yatiran eksen
+        if u.Length > 1e-9:
+            d = App.Rotation(u.normalize(), pitch).multVec(d)
+    return d
 
 
 def _transport(bs, t0, steps=64):
@@ -451,7 +666,8 @@ def guide_nodes(obj, prof=None):
     pa, pb = prof
     pts = list(obj.GuidePoints)
     ta, tb = _directions(pa, pb, pts, obj.TypeId == "PartDesign::FeatureSubtractivePython", obj.Reversed)
-    return [pa[1]] + pts + ([pb[1]] if pb is not None else []), ta, tb
+    N = [pa[1]] + pts + ([pb[1]] if pb is not None else [])
+    return N, ta, _end_dir(obj, N, ta, tb)
 
 
 def preview_rings(obj, prof, K=48, M=24):
@@ -464,7 +680,7 @@ def preview_rings(obj, prof, K=48, M=24):
     N, ta, tb = res
     pa, pb = prof
     try:
-        bs = guide_spline(N, ta, tb, obj.Tension)
+        bs = guide_curve(obj, N, ta, tb)
         F = _stations(bs.toShape(), K, 4)
         wa = _oriented(pa[0], ta)
         a = [p - pa[1] for p in wa.discretize(M + 1)[:M]]
@@ -519,6 +735,7 @@ def build_tools(obj):
     ta, tb = _directions(pa, pb, pts, obj.TypeId == "PartDesign::FeatureSubtractivePython", obj.Reversed)
     ca = pa[1]
     N = [ca] + pts + ([pb[1]] if pb is not None else [])
+    tb = _end_dir(obj, N, ta, tb)                          # serbest uc: EndAngle kadar dondurulmus uc yonu
     for i in range(len(N) - 1):
         if (N[i + 1] - N[i]).Length < 1e-6:
             yield "Rail Pipe: two guide points are on top of each other"
@@ -529,7 +746,7 @@ def build_tools(obj):
     ea = min(0.5, 0.05 * pa[0].BoundBox.DiagonalLength) if pa[3] else 0.0
     eb = min(0.5, 0.05 * pb[0].BoundBox.DiagonalLength) if pb is not None and pb[3] else 0.0
     fb = pb
-    bs = guide_spline(N, ta, tb, obj.Tension, ea, eb)
+    bs = guide_curve(obj, N, ta, tb, ea, eb)
     spine = Part.Wire(bs.toShape())
     global LAST_BEND
     LAST_BEND = (bs, pa[0], ca)
@@ -554,8 +771,43 @@ def build_tools(obj):
     box = spine.BoundBox
     box.enlarge(2.0 * max(wa.BoundBox.DiagonalLength, wb.BoundBox.DiagonalLength))
     mid = bs.value((bs.FirstParameter + bs.LastParameter) / 2)
-    binormal = _plane_normal([ca] + N[1:] + [end], ta)
+    binormal = _plane_normal([ca] + N[1:] + [end], ta, 2e-3)   # (neredeyse) duzlemsel kilavuz: duzlem normali
+    if abs(_end_angles(obj)[1]) > 1e-9:
+        binormal = None                                    # uc duzlemden egik: kilavuz duzlemsel degil
     wb_dir = tb if fb is not None else R.multVec(ta)      # B telinin donus yonu (ic tel de ayni yone)
+    # delikler (sketch'te Make Internals, yuzun ic telleri): ayni yontemle supurulur, borudan cikarilir (Shell'in ic
+    # borusu gibi). Iki profilde delik sayisi esit olmali; alana (sonra merkeze uzakliga) gore eslesir.
+    holes = []
+    ha = profile_holes(obj.StartFace, g)
+    hb = profile_holes(obj.EndFace, g) if fb is not None else []
+    if ha or hb:
+        if fb is not None and len(ha) != len(hb):
+            yield "Rail Pipe: the start and end profiles must have the same number of holes"
+            return
+        srt = lambda c0: (lambda w: (-round(Part.Face(w).Area, 6), (Part.Face(w).CenterOfMass - c0).Length))
+        ha.sort(key=srt(pa[1]))
+        if fb is not None:
+            hb.sort(key=srt(pb[1]))
+        for i, h in enumerate(ha):
+            try:
+                ia_ = _oriented(h, ta).copy()
+                ia_.translate(-ta * ea)
+                if fb is not None:
+                    ib_ = _oriented(hb[i], tb).copy()
+                    ib_.translate(tb * eb)
+                else:
+                    ib_ = ia_.copy()
+                    ib_.translate(-ca)
+                    ib_.rotate(V(), R.Axis, math.degrees(R.Angle))
+                    ib_.scale(max(obj.EndScale, 0.01))
+                    ib_.translate(N[-1])
+                f0 = ia_.OrderedEdges[0].Vertexes[0].Point
+                ib_ = _start_near(ib_, R.multVec(f0 - ca) * (obj.EndScale if fb is None else 1.0) + end)
+                probe = _inside_pt(ia_) + ta * (0.02 * max(ia_.BoundBox.DiagonalLength, 1.0))
+                holes.append((ia_, ib_, probe))
+            except Exception:
+                yield "Rail Pipe: the hole profile could not be read"
+                return
     # sirayla denenir, gecerli ve egrinin cevresinde kalan ilk sonuc alinir:
     # 1. CorrectedFrenet + C1 yaklasim (setMaxDegree 3, 1000 parca, 1e-4 tolerans): C1 yuzey. Thickness / fillet /
     #    ofset icin sart: C1'siz yuzey kilavuz noktalarinda parametrik C0 kaliyor (CorrectedFrenet cercevesi
@@ -574,25 +826,48 @@ def build_tools(obj):
     auxs = [] if PREVIEW else [a for a in (_aux_spine(bs, ta, first - ca, size * k) for k in (1.0, 2.0)) if a]
     # Yardimci omurga OCCT'de kirilgan: egrisel eslesme kapaliyken bazen dakikalarca takiliyor; yalniz egrisel
     # eslesme + C1 denenir (profil boyu ve iki kati uzakta). Surukleme sirasinda (PREVIEW) hic denenmez.
-    tries = [(("frenet", None, None), c1) for c1 in ((False, True) if PREVIEW else (True, False))]
-    tries += [(("aux", a, True), True) for a in auxs]
-    tries += [(("binormal", binormal, None), c1) for c1 in (True, False)] if binormal is not None else []
+    frenet = [(("frenet", None, None), c1) for c1 in ((False, True) if PREVIEW else (True, False))]
+    frenet += [(("aux", a, True), True) for a in auxs]
+    # binormal + ForceApproxC1 uretilen yuzeyin egri-yuzey (pcurve) kaydi BOP strict kontrolunde
+    # BOPAlgo_InvalidCurveOnSurface veriyor (olculdu); C1 yaklasimi olmadan temiz, bu yuzden once o denenir.
+    binor = [(("binormal", binormal, None), c1) for c1 in (False, True)] \
+        if binormal is not None else []
+    # serbest uc + (neredeyse) duzlemsel kilavuz: binormal modu kesiti duzlemin normaline gore sabit tutar. CorrectedFrenet
+    # cercevesi egrilik isaret degistirdigi (S biciminde kivrim) yerde boruyu eksen etrafinda burar (olculdu: 150 x 30
+    # profilde +-0.5 derece, kalinlik 30 -> 31.3 mm; kenarda kirisiklik) ve uc acisi verilince 2.7 derecelik burulma ve
+    # kesit alaninda %20 sisme yapti. Iki profilli supurme eskisi gibi Frenet'le baslar (binormal orada bazen gecersiz).
+    tries = (binor + frenet) if (fb is None and binor) else (frenet + binor)
     global LAST_MODE
     # 0. iki ucu daire olan boru: kendi burulmasiz cercevemizle daire kesitler + loft (asagida _loft_tool). En
     #    duzgunu: motor-test borulari r=20 +- 0.025 mm, normal sapmasi < 0.4 derece, C2, boyunca ~50 kontrol noktasi
     #    (supurme 210: ekranda yamali parliyordu), ~0.06 s. Boyu degisen elipsler arasindaki loft ofsette
     #    'command not done' verdi: obur tek kenarli profiller supurmeyle kalir.
     circle = lambda w: len(w.Edges) == 1 and "Circle" in w.Edges[0].Curve.TypeId
-    specs = [("loft", None, None, None)] if not PREVIEW and circle(wa) and circle(wb) else []
+    cen = lambda w: Part.Face(w).CenterOfMass
+    # loft yalniz delik yoksa ya da delikler es merkezli dairelerse (loft kesiti kilavuz uzerine ortalar)
+    loft_ok = all(circle(a) and circle(b) and (cen(a) - cen(wa)).Length < 1e-6 * size
+                  and (cen(b) - cen(wb)).Length < 1e-6 * size for a, b, _ in holes)
+    specs = [("loft", None, None, None)] if not PREVIEW and circle(wa) and circle(wb) and loft_ok else []
+    # burulmasiz cerceveli loft (serbest uc: _rmf_loft; iki profil: _rmf_blend, kenar sayilari esitse): duzlemsel olmayan kilavuzda
+    # (binormal yok) ilk, duzlemselde binormal sweep'ten sonra yedek
+    rmf = [("rmf", None, None, False)] if not PREVIEW else []
+    if binormal is None:
+        specs += rmf
     specs += [(m, a, cq, c1) for (m, a, cq), c1 in tries]
+    if binormal is not None:
+        specs += rmf
     err = ["Rail Pipe: the sweep gave no solid"]
 
-    def make(spec, wa_, wb_):
-        """Bir yontemle (spec) wa_ -> wb_ katisi: gecerli, disari donuk ve egrinin cevresinde; olmazsa None."""
+    def make(spec, wa_, wb_, probe=None):
+        """Bir yontemle (spec) wa_ -> wb_ katisi: gecerli, disari donuk ve egrinin cevresinde; olmazsa None.
+        probe: katinin icinde bir nokta (kilavuzdan uzak delik borusu icin; yoksa kilavuzun ortasi)."""
         mode, arg, cureq, c1 = spec
         try:
             if mode == "loft":
                 tool = _loft_tool(spine, wa_, wb_, size)
+            elif mode == "rmf":
+                tool = _rmf_blend(spine, wa_, wb_, size) if fb is not None else \
+                    _rmf_loft(spine, wa_, size, max(float(obj.EndScale), 0.01))
             else:
                 ps = Part.BRepOffsetAPI.MakePipeShell(spine)
                 if mode == "aux":
@@ -603,9 +878,9 @@ def build_tools(obj):
                     ps.setFrenetMode(False)
                 ps.setForceApproxC1(c1)
                 if c1:                                     # sik parcali C1 yaklasim: dogru ve ofsetlenebilir
-                    ps.setMaxDegree(3)
-                    ps.setMaxSegments(1000)
-                    ps.setTolerance(1e-4, 1e-4, 1e-2)
+                    ps.setMaxDegree(C1_APPROX[0])
+                    ps.setMaxSegments(C1_APPROX[1])
+                    ps.setTolerance(*C1_APPROX[2])
                 ps.add(wa_, False, False)
                 if not single:
                     ps.add(wb_, False, False)
@@ -618,7 +893,7 @@ def build_tools(obj):
         if tool is None or tool.isNull() or not tool.Solids:
             return None
         tool = tool.Solids[0]
-        if not PREVIEW and not tool.isInside(mid, 1e-7, True):   # ters yuzlu (ici disina donuk) cikabiliyor:
+        if not PREVIEW and not tool.isInside(mid if probe is None else probe, 1e-7, True):   # ters yuzlu (ici disina donuk) cikabiliyor:
             tool.reverse()                                 # cevir (onizlemede gerekmez: yalniz boolean icin)
         if tool.isValid() and (PREVIEW or box.isInside(_tight_box(tool))):   # onizleme: kutu denetimi yok (hiz)
             return tool
@@ -640,23 +915,49 @@ def build_tools(obj):
         except Exception:
             yield "Rail Pipe: the wall is too thick for the profile"
             return
-    given = False
-    for spec in specs:
+    cuts = ([(inner[0], inner[1], None)] if inner is not None else []) + holes
+    # C1 yaklasimi hedef toleransi tutturamazsa (olculdu: 3B kilavuzda kivrimda kenar toleransi 0.37 mm, hacim 0.025 %
+    # eksik, yuzey dalgali, STEP kontrolu 'Largest tolerance' hatasi) yuzey yine de C1 verir ama dogru degildir; C1'siz
+    # sonuc ayni kilavuzda 0.0002 mm cikti. Bu yuzden kotu C1 sonucu sona ertelenir (ofset / Thickness yine mumkun kalsin
+    # diye tamamen atilmaz): once saglam denemeler, hicbiri tutmazsa ertelenenler.
+    tol_ok = 0.01 + 1e-4 * size
+
+    def finish(spec, gate):
         tool = make(spec, wa, wb)
         if tool is None:
-            continue
-        if inner is not None:                              # ayni yontemle ic boru, dis borudan cikar
-            hole = make(spec, inner[0], inner[1])
+            return None
+        if gate and spec[3] and max(e.Tolerance for e in tool.Edges) > tol_ok:
+            return "soft"
+        for a_, b_, pr in cuts:                            # ayni yontemle ic boru / delik borulari, dis borudan cikar
+            hole = make(spec, a_, b_, pr)
             if hole is None:
-                continue
+                return None
             try:
                 tool = tool.cut(hole)
             except Exception:
-                continue
+                return None
             if tool.isNull() or not tool.Solids or not tool.isValid():
-                continue
+                return None
             tool = tool.Solids[0] if len(tool.Solids) == 1 else tool
+        return tool
+
+    given = False
+    soft = []
+    for spec in specs:
+        tool = finish(spec, not PREVIEW)
+        if isinstance(tool, str):
+            soft.append(spec)
+            continue
+        if tool is None:
+            continue
         LAST_MODE = spec[:3] if spec[0] != "loft" else ("loft", None, None)
+        yield tool
+        given = True
+    for spec in soft:
+        tool = finish(spec, False)
+        if tool is None:
+            continue
+        LAST_MODE = spec[:3]
         yield tool
         given = True
     if not given:
@@ -739,6 +1040,81 @@ def _loft_tool(spine, wa, wb, size):
     return Part.makeLoft(secs, True, False, False, 5)
 
 
+def _rmf_loft(spine, w, size, scale=1.0):
+    """Herhangi bir kapali tel (cok kenarli oluk, delik...) icin burulmasiz (parallel transport) cerceveli loft: kesit
+    kilavuz boyunca K istasyonda, baslangic merkezi etrafinda tasinip doner ve 1 -> scale olcegine olceklenir; tum
+    kesitler ayni donusumle uretildigi icin kenar sayisi ve dikis hizasi ayni kalir. OCCT'nin CorrectedFrenet
+    cercevesi 3B (duzlemsel olmayan) kilavuzda kivrimda burulup C1 yaklasimi 36 mm saptigi icin buna basvurulur."""
+    e = spine.Edges[0]
+    K = int(min(max(48, math.ceil(e.Length / (0.25 * size))), 240))
+    F = _stations(e, K)
+    c0 = F[0][0]
+    secs = [w]
+    for i in range(1, K + 1):
+        c, t, R = F[i]
+        sec = w.copy()
+        sec.translate(-c0)
+        sc = 1.0 + (scale - 1.0) * i / float(K)
+        if abs(sc - 1.0) > 1e-12:
+            sec.scale(sc)
+        if abs(R.Angle) > 1e-12:
+            sec.rotate(V(), R.Axis, math.degrees(R.Angle))
+        sec.translate(c)
+        secs.append(sec)
+    return Part.makeLoft(secs, True, False, False, 5)
+
+
+def _rmf_blend(spine, wa, wb, size):
+    """Iki profilli supurme icin burulmasiz cerceveli loft (_rmf_loft'un A -> B harmani): A ve B'nin kenar sayisi esit
+    olmali (oluk 4 kenar + 4 kenar; delik 1 + 1). Her kenar 24 aralikla orneklenir, kesitte kenar basina bir spline
+    olarak harmanlanir: koseler (kenar uclari) korunur. B, sonda tasinan cercevede ifade edilir (_loft_tool gibi), bu
+    yuzden ara kesitler A'nin sekli ile B'nin sekli arasinda burulmasiz gecer."""
+    ea_, eb_ = wa.OrderedEdges, wb.OrderedEdges
+    if len(ea_) != len(eb_):
+        raise ValueError("profiles have a different number of edges")
+    e = spine.Edges[0]
+    K = int(min(max(48, math.ceil(e.Length / (0.25 * size))), 240))
+    F = _stations(e, K)
+    c0, cb, inv = F[0][0], Part.Face(wb).CenterOfMass, F[-1][2].inverted()
+    M = 24
+
+    def samp(ed):
+        pts = [ed.valueAt(ed.FirstParameter + (ed.LastParameter - ed.FirstParameter) * j / M) for j in range(M + 1)]
+        return pts[::-1] if ed.Orientation == "Reversed" else pts
+
+    A = [[p - c0 for p in samp(ed)] for ed in ea_]
+    B = [[inv.multVec(p - cb) for p in samp(ed)] for ed in eb_]
+    if len(ea_) == 1 and ea_[0].isClosed() and eb_[0].isClosed():
+        # tek kapali kenar (delik cemberi): B'nin baslangic noktasi/yonu A'ninkiyle uyusmali, yoksa harman
+        # merkeze dogru cokup kendini keser
+        a, b = A[0], B[0][:-1]
+        best = None
+        for seq in (b, b[::-1]):
+            for k in range(len(seq)):
+                r = seq[k:] + seq[:k]
+                d = sum((x - y).Length for x, y in zip(a, r))
+                if best is None or d < best[0]:
+                    best = (d, r)
+        B[0] = best[1] + [best[1][0]]
+    closed1 = len(ea_) == 1 and ea_[0].isClosed() and eb_[0].isClosed()
+    secs = [wa]
+    for i in range(1, K):
+        c, t, R = F[i]
+        s = i / float(K)
+        edges = []
+        for ja, jb in zip(A, B):
+            bs = Part.BSplineCurve()
+            pts = [c + R.multVec(a * (1.0 - s) + b * s) for a, b in zip(ja, jb)]
+            if closed1:
+                bs.interpolate(Points=pts[:-1], PeriodicFlag=True)   # kapali kesit: dikiste burkulma yok
+            else:
+                bs.interpolate(pts)
+            edges.append(bs.toShape())
+        secs.append(Part.Wire(edges))
+    secs.append(wb)
+    return Part.makeLoft(secs, True, False, False, 5)
+
+
 def _inset(w, d):
     """Kapali teli d kadar iceri ofsetle. makeOffset2D'nin isareti kenar yonune bagli (ters yonlu daire -2 ile
     buyuyordu): alani kuculten taraf alinir."""
@@ -758,6 +1134,27 @@ def _shell_props(obj):
         obj.WallThickness = 2.0
 
 
+def _guide_props(obj):
+    """SmoothGuide / EndAngle / EndPitch (sonradan eklendi: eski nesnelerde belge acilinca ya da duzenlenirken eklenir; kapali /
+    0 olduklari icin kayitli sekil degismez)."""
+    if "SmoothGuide" not in obj.PropertiesList:
+        obj.addProperty("App::PropertyBool", "SmoothGuide", "Rail",
+                        "Smooth (C2) guide curve through the points. Off: the older curve (C1) shaped by Tension")
+    if "GuideType" not in obj.PropertiesList:
+        obj.addProperty("App::PropertyEnumeration", "GuideType", "Rail",
+                        "Guide curve type: Hermite (C1, shaped by Tension), Smooth (C2 through the points) or "
+                        "BSpline (control points: the curve stays inside the polygon and does not pass through them)")
+        obj.GuideType = ["Hermite", "Smooth", "BSpline"]
+        obj.GuideType = "Smooth" if getattr(obj, "SmoothGuide", False) else "Hermite"
+    if "EndPitch" not in obj.PropertiesList:
+        obj.addProperty("App::PropertyFloat", "EndPitch", "Rail",
+                        "Free end: tilts the end direction out of the plane the guide bends in by this angle in degrees")
+    if "EndAngle" not in obj.PropertiesList:
+        obj.addProperty("App::PropertyFloat", "EndAngle", "Rail",
+                        "Free end: turns the end direction by this angle in degrees (positive: bends further the way "
+                        "the guide already bends). 0: the end follows the last span")
+
+
 class RailPipe:
     """Rail Pipe (FeatureAdditivePython) / Rail Groove (FeatureSubtractivePython) nesnesinin Proxy'si."""
 
@@ -771,6 +1168,7 @@ class RailPipe:
         obj.addProperty("App::PropertyFloat", "EndScale", "Rail", "Size of the free end relative to A").EndScale = 1.0
         obj.addProperty("App::PropertyBool", "Reversed", "Rail", "Leave A to the other side")
         _shell_props(obj)
+        _guide_props(obj)
         if not is_part(obj):                               # Part surumunde boolean yok: Refine gereksiz
             if "Refine" not in obj.PropertiesList:         # PartDesign'in kendi Refine ozelligi (yoksa ekle)
                 obj.addProperty("App::PropertyBool", "Refine", "Base", "Merge coplanar faces of the result")
@@ -817,6 +1215,7 @@ class RailPipe:
 
     def onDocumentRestored(self, obj):
         _shell_props(obj)
+        _guide_props(obj)
 
     def dumps(self):
         return None
@@ -832,6 +1231,26 @@ class ViewProviderRailPipe:
 
     def attach(self, vobj):
         self.Object = vobj.Object
+
+    def claimChildren(self):
+        """Agacta profil sketch'i (ve Binder'i) Rail Pipe'in altinda gorunur (Pad'deki gibi). Yalniz ayni Body'nin
+        PartDesign profilleri: Part surumunde profil baska bir nesnenin yuzu olabilir."""
+        obj = getattr(self, "Object", None)
+        out = []
+        try:
+            if obj is None or is_part(obj):
+                return out
+            body = obj.getParentGeoFeatureGroup()
+            for link in (obj.StartFace, obj.EndFace):
+                o = link[0] if link else None
+                if o is None or o in out:
+                    continue
+                if (_is_sketch(o) or o.TypeId == "PartDesign::SubShapeBinder") and \
+                        o.getParentGeoFeatureGroup() == body:
+                    out.append(o)
+        except Exception:
+            pass
+        return out
 
     def doubleClicked(self, vobj):
         import FreeCADGui as Gui

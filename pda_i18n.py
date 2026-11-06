@@ -351,4 +351,28 @@ TR = {
         'Gerginlik',
     'The guide follows the dragged point like a cable':
         'Kılavuz, sürüklenen noktayı kablo gibi izler',
+    'Smooth guide (C2)':
+        'Düzgün kılavuz (C2)',
+    'Smooth curve through the points: the curvature has no jumps at the points, so a wide pipe has no corners on its inner edge. Off: the older curve shaped by Tension':
+        'Noktalardan geçen düzgün eğri: eğrilik noktalarda sıçramaz, geniş bir borunun iç kenarında köşe oluşmaz. Kapalı: Gerginlik ile biçimlenen eski eğri',
+    'End angle':
+        'Uç açısı',
+    'Free end: turns the end direction (and the end face) by this angle. Positive: bends further the way the guide already bends. 0: the end follows the last span':
+        'Serbest uç: uç yönünü (ve uç yüzünü) bu açı kadar döndürür. Pozitif: kılavuzun zaten kıvrıldığı yöne doğru daha çok kıvırır. 0: uç, son aralığı izler',
+    'End pitch':
+        'Uç eğimi',
+    'Free end: tilts the end direction out of the plane the guide bends in. Use it with End angle to aim the end in any direction':
+        'Serbest uç: uç yönünü kılavuzun kıvrıldığı düzlemden dışarı yatırır. Uç açısıyla birlikte ucu istenen yöne çevirir',
+    'Pulls the guide toward the straight lines between the points. Higher: less bulge between the points':
+        'Kılavuzu noktalar arasındaki düz çizgilere doğru çeker. Yükseldikçe noktalar arasındaki şişme azalır',
+    'Curve type':
+        'Eğri tipi',
+    'Hermite (C1)':
+        'Hermite (C1)',
+    'Smooth (C2)':
+        'Düzgün (C2)',
+    'B-spline (control points)':
+        'B-spline (kontrol noktalı)',
+    'Hermite: the older curve through the points, shaped by Tension. Smooth: curve through the points without curvature jumps. B-spline: the points are control points; the curve stays inside their polygon (no bulges or loops) but does not pass through them':
+        'Hermite: noktalardan geçen eski eğri, Gerginlik ile biçimlenir. Düzgün: noktalardan geçen, eğriliği sıçramayan eğri. B-spline: noktalar kontrol noktasıdır; eğri onların çokgeninin içinde kalır (şişme ya da döngü yapmaz) ama üzerlerinden geçmez',
 }
