@@ -311,10 +311,50 @@ def guide_smooth(N, ta, tb=None, ext_a=0.0, ext_b=0.0, tension=0.0):
     return fit(P2, par2)
 
 
+def guide_bspline(N, ta, tb=None, ext_a=0.0, ext_b=0.0):
+    """Kontrol noktali B-spline kilavuz: dugumler (N) kontrol cokgeninin kosesidir, egri aralarindan YAKINDAN gecer ama
+    ustunden gecmez (kontrol cokgeninin icinde kalir: 'gobek', asma ya da dongu yapmaz, C2). Egri A'nin merkezinden
+    (ext_a > 0: A'nin gerisinden) baslar, ta yonunde cikar; serbest uc N[-1]'de son kirisin yonunde biter, B yuzunde
+    tb yonunde girip B'nin otesinde (ext_b) biter. Ilk / son kontrol bacagi uzunlugu ilk / son kirisin 1/3'u."""
+    n = len(N)
+    d0 = (N[1] - N[0]).Length
+    dl = (N[-1] - N[-2]).Length
+    P = [N[0] - ta * ext_a if ext_a > 0 else V(N[0]), N[0] + ta * (d0 / 3.0)]
+    P += [V(p) for p in N[1:-1]]
+    if tb is not None:
+        P.append(N[-1] - tb * (dl / 3.0))
+        P.append(N[-1] + tb * ext_b if ext_b > 0 else V(N[-1]))
+    else:
+        P.append(V(N[-1]))
+    m = len(P)
+    deg = min(3, m - 1)
+    nk = m - deg + 1                                       # kapali (clamped) duzgun dugum vektoru
+    knots = [float(i) for i in range(nk)]
+    mults = [deg + 1] + [1] * (nk - 2) + [deg + 1]
+    bs = Part.BSplineCurve()
+    bs.buildFromPolesMultsKnots(P, mults, knots, False, deg)
+    return bs
+
+
+def guide_type(obj):
+    """'Hermite' (C1, Tension), 'Smooth' (C2 enterpolasyon) ya da 'BSpline' (kontrol noktali). Eski nesnelerde GuideType
+    yoktur: SmoothGuide'dan."""
+    gt = getattr(obj, "GuideType", None)
+    if gt in ("Hermite", "Smooth", "BSpline"):
+        return gt
+    return "Smooth" if getattr(obj, "SmoothGuide", False) else "Hermite"
+
+
 def guide_curve(obj, N, ta, tb=None, ext_a=0.0, ext_b=0.0):
-    """Nesnenin kilavuz egrisi: SmoothGuide aciksa duzgun (C2), degilse eski Hermite (C1, Tension). Interpolasyon
-    basarisiz olursa (tek aralik gibi uc durumlar) Hermite'e dusulur."""
-    if getattr(obj, "SmoothGuide", False):
+    """Nesnenin kilavuz egrisi (GuideType): B-spline, duzgun C2 enterpolasyon ya da eski Hermite (C1, Tension).
+    Olmazsa (tek aralik gibi uc durumlar) Hermite'e dusulur."""
+    gt = guide_type(obj)
+    if gt == "BSpline" and len(N) >= 2:
+        try:
+            return guide_bspline(N, ta, tb, ext_a, ext_b)   # serbest uc (tb None): son kirisin yonunde biter
+        except Exception:
+            pass
+    elif gt == "Smooth":
         try:
             if tb is None and len(N) >= 2 and (N[-1] - N[-2]).Length > 1e-9:
                 tb = (N[-1] - N[-2]).normalize()           # serbest uc: son araligin yonu (Hermite'teki gibi)
@@ -1014,6 +1054,12 @@ def _guide_props(obj):
     if "SmoothGuide" not in obj.PropertiesList:
         obj.addProperty("App::PropertyBool", "SmoothGuide", "Rail",
                         "Smooth (C2) guide curve through the points. Off: the older curve (C1) shaped by Tension")
+    if "GuideType" not in obj.PropertiesList:
+        obj.addProperty("App::PropertyEnumeration", "GuideType", "Rail",
+                        "Guide curve type: Hermite (C1, shaped by Tension), Smooth (C2 through the points) or "
+                        "BSpline (control points: the curve stays inside the polygon and does not pass through them)")
+        obj.GuideType = ["Hermite", "Smooth", "BSpline"]
+        obj.GuideType = "Smooth" if getattr(obj, "SmoothGuide", False) else "Hermite"
     if "EndPitch" not in obj.PropertiesList:
         obj.addProperty("App::PropertyFloat", "EndPitch", "Rail",
                         "Free end: tilts the end direction out of the plane the guide bends in by this angle in degrees")

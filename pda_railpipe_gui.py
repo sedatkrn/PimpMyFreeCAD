@@ -509,17 +509,23 @@ class Panel(object):
         self.elastic.setValue(ed.elastic)
         self.elastic.valueChanged.connect(lambda v: setattr(self.ed, "elastic", float(v)))
         grid.addWidget(self.elastic, 1, 1)
-        self.smooth = QtWidgets.QCheckBox(T("Smooth guide (C2)"))
-        self.smooth.setToolTip(T("Smooth curve through the points: the curvature has no jumps at the points, so a wide "
-                                 "pipe has no corners on its inner edge. Off: the older curve shaped by Tension"))
-        self.smooth.setChecked(bool(ed.obj.SmoothGuide))
-        self.smooth.toggled.connect(self._smooth_toggled)
-        grid.addWidget(self.smooth, 2, 0, 1, 2)
+        grid.addWidget(QtWidgets.QLabel(T("Curve type")), 2, 0)
+        self.gtype = QtWidgets.QComboBox()
+        self.gtypes = ("Hermite", "Smooth", "BSpline")
+        for name in (T("Hermite (C1)"), T("Smooth (C2)"), T("B-spline (control points)")):
+            self.gtype.addItem(name)
+        self.gtype.setToolTip(T("Hermite: the older curve through the points, shaped by Tension. Smooth: curve through "
+                                "the points without curvature jumps. B-spline: the points are control points; the "
+                                "curve stays inside their polygon (no bulges or loops) but does not pass through them"))
+        self.gtype.setCurrentIndex(self.gtypes.index(rp.guide_type(ed.obj)))
+        self.gtype.currentIndexChanged.connect(self._gtype_changed)
+        grid.addWidget(self.gtype, 2, 1)
         grid.addWidget(QtWidgets.QLabel(T("Tension")), 3, 0)
         self.tension = self._spin(0.0, 1.0, 2, "", 0.05)
         self.tension.setToolTip(T("Pulls the guide toward the straight lines between the points. Higher: less bulge "
                                   "between the points"))
         self.tension.setValue(ed.obj.Tension)
+        self.tension.setEnabled(rp.guide_type(ed.obj) != "BSpline")
         self.tension.valueChanged.connect(lambda v: self.ed.set_prop("Tension", float(v)))
         grid.addWidget(self.tension, 3, 1)
         grid.addWidget(QtWidgets.QLabel(T("End scale")), 4, 0)
@@ -577,8 +583,11 @@ class Panel(object):
         lay.addStretch()
         self.sync()
 
-    def _smooth_toggled(self, on):
-        self.ed.set_prop("SmoothGuide", bool(on))
+    def _gtype_changed(self, i):
+        t = self.gtypes[i]
+        self.tension.setEnabled(t != "BSpline")            # Tension: Hermite ve Smooth
+        self.ed.set_prop("SmoothGuide", t == "Smooth")
+        self.ed.set_prop("GuideType", t)
 
     @staticmethod
     def _spin(lo, hi, dec, suffix, step=1.0):

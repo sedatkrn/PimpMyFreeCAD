@@ -365,4 +365,14 @@ TR = {
         'Serbest uç: uç yönünü kılavuzun kıvrıldığı düzlemden dışarı yatırır. Uç açısıyla birlikte ucu istenen yöne çevirir',
     'Pulls the guide toward the straight lines between the points. Higher: less bulge between the points':
         'Kılavuzu noktalar arasındaki düz çizgilere doğru çeker. Yükseldikçe noktalar arasındaki şişme azalır',
+    'Curve type':
+        'Eğri tipi',
+    'Hermite (C1)':
+        'Hermite (C1)',
+    'Smooth (C2)':
+        'Düzgün (C2)',
+    'B-spline (control points)':
+        'B-spline (kontrol noktalı)',
+    'Hermite: the older curve through the points, shaped by Tension. Smooth: curve through the points without curvature jumps. B-spline: the points are control points; the curve stays inside their polygon (no bulges or loops) but does not pass through them':
+        'Hermite: noktalardan geçen eski eğri, Gerginlik ile biçimlenir. Düzgün: noktalardan geçen, eğriliği sıçramayan eğri. B-spline: noktalar kontrol noktasıdır; eğri onların çokgeninin içinde kalır (şişme ya da döngü yapmaz) ama üzerlerinden geçmez',
 }
