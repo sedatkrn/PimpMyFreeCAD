@@ -20,6 +20,9 @@ V = App.Vector
 PROPS = "GuidePoints"     # bu ozellik varsa nesne Rail Pipe / Groove'dur (onarim, komutlar)
 PREVIEW = False           # ekranda surukleme sirasinda True: yavas (kaliteli) supurme yontemi atlanir
 LAST_MODE = None          # son supurmenin yontemi (tani)
+# C2 kilavuzda Tension 0 bile bu kadar kirisa cekim uygular: saf kenetli kubik spline uca yakin yaricapi sert daraltiyordu
+# (olculdu: 200 x 80 profilde kilavuz yaricapi 57 mm -> ic kenar katlandi, BOP SelfIntersect); 0.3'te 141 mm (eski Hermite 169).
+SMOOTH_BASE = 0.3
 C1_APPROX = (3, 1000, (1e-4, 1e-4, 1e-2))   # C1 yaklasim: en yuksek derece, en cok parca, (3B, sinir, aci) toleransi
 LAST_BEND = None          # son kilavuz: (egri, A teli, A merkezi); hata metni icin
 
@@ -314,7 +317,8 @@ def guide_curve(obj, N, ta, tb=None, ext_a=0.0, ext_b=0.0):
         try:
             if tb is None and len(N) >= 2 and (N[-1] - N[-2]).Length > 1e-9:
                 tb = (N[-1] - N[-2]).normalize()           # serbest uc: son araligin yonu (Hermite'teki gibi)
-            return guide_smooth(N, ta, tb, ext_a, ext_b, float(getattr(obj, "Tension", 0.0)))
+            t = min(max(float(getattr(obj, "Tension", 0.0)), 0.0), 1.0)
+            return guide_smooth(N, ta, tb, ext_a, ext_b, SMOOTH_BASE + (1.0 - SMOOTH_BASE) * t)
         except Exception:
             pass
     return guide_spline(N, ta, tb, float(getattr(obj, "Tension", 0.0)), ext_a, ext_b)
