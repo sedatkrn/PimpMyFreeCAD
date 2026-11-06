@@ -1018,6 +1018,7 @@ def _loft_tool(spine, wa, wb, size):
         inv = F[-1][2].inverted()                          # B'nin sekli, oraya tasinan cercevede
         pa = [sample_a(j) - ca for j in range(M)]
         pb = [inv.multVec(sample_b(j) - cb) for j in range(M)]
+    closed1 = len(ea_) == 1 and ea_[0].isClosed() and eb_[0].isClosed()
     secs = [wa]
     for i in range(1, K):
         c, t, R = F[i]
@@ -1103,7 +1104,11 @@ def _rmf_blend(spine, wa, wb, size):
         edges = []
         for ja, jb in zip(A, B):
             bs = Part.BSplineCurve()
-            bs.interpolate([c + R.multVec(a * (1.0 - s) + b * s) for a, b in zip(ja, jb)])
+            pts = [c + R.multVec(a * (1.0 - s) + b * s) for a, b in zip(ja, jb)]
+            if closed1:
+                bs.interpolate(Points=pts[:-1], PeriodicFlag=True)   # kapali kesit: dikiste burkulma yok
+            else:
+                bs.interpolate(pts)
             edges.append(bs.toShape())
         secs.append(Part.Wire(edges))
     secs.append(wb)
