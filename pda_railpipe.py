@@ -20,6 +20,7 @@ V = App.Vector
 PROPS = "GuidePoints"     # bu ozellik varsa nesne Rail Pipe / Groove'dur (onarim, komutlar)
 PREVIEW = False           # ekranda surukleme sirasinda True: yavas (kaliteli) supurme yontemi atlanir
 LAST_MODE = None          # son supurmenin yontemi (tani)
+C1_APPROX = (3, 1000, (1e-4, 1e-4, 1e-2))   # C1 yaklasim: en yuksek derece, en cok parca, (3B, sinir, aci) toleransi
 LAST_BEND = None          # son kilavuz: (egri, A teli, A merkezi); hata metni icin
 
 
@@ -782,9 +783,9 @@ def build_tools(obj):
                     ps.setFrenetMode(False)
                 ps.setForceApproxC1(c1)
                 if c1:                                     # sik parcali C1 yaklasim: dogru ve ofsetlenebilir
-                    ps.setMaxDegree(3)
-                    ps.setMaxSegments(1000)
-                    ps.setTolerance(1e-4, 1e-4, 1e-2)
+                    ps.setMaxDegree(C1_APPROX[0])
+                    ps.setMaxSegments(C1_APPROX[1])
+                    ps.setTolerance(*C1_APPROX[2])
                 ps.add(wa_, False, False)
                 if not single:
                     ps.add(wb_, False, False)
