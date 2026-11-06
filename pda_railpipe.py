@@ -1084,6 +1084,18 @@ def _rmf_blend(spine, wa, wb, size):
 
     A = [[p - c0 for p in samp(ed)] for ed in ea_]
     B = [[inv.multVec(p - cb) for p in samp(ed)] for ed in eb_]
+    if len(ea_) == 1 and ea_[0].isClosed() and eb_[0].isClosed():
+        # tek kapali kenar (delik cemberi): B'nin baslangic noktasi/yonu A'ninkiyle uyusmali, yoksa harman
+        # merkeze dogru cokup kendini keser
+        a, b = A[0], B[0][:-1]
+        best = None
+        for seq in (b, b[::-1]):
+            for k in range(len(seq)):
+                r = seq[k:] + seq[:k]
+                d = sum((x - y).Length for x, y in zip(a, r))
+                if best is None or d < best[0]:
+                    best = (d, r)
+        B[0] = best[1] + [best[1][0]]
     secs = [wa]
     for i in range(1, K):
         c, t, R = F[i]
