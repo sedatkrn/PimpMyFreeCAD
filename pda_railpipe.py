@@ -848,9 +848,9 @@ def build_tools(obj):
     loft_ok = all(circle(a) and circle(b) and (cen(a) - cen(wa)).Length < 1e-6 * size
                   and (cen(b) - cen(wb)).Length < 1e-6 * size for a, b, _ in holes)
     specs = [("loft", None, None, None)] if not PREVIEW and circle(wa) and circle(wb) and loft_ok else []
-    # burulmasiz cerceveli loft (serbest uc; iki profilli supurmede B'ye gecis yok): duzlemsel olmayan kilavuzda
+    # burulmasiz cerceveli loft (serbest uc: _rmf_loft; iki profil: _rmf_blend, kenar sayilari esitse): duzlemsel olmayan kilavuzda
     # (binormal yok) ilk, duzlemselde binormal sweep'ten sonra yedek
-    rmf = [("rmf", None, None, False)] if (not PREVIEW and fb is None) else []
+    rmf = [("rmf", None, None, False)] if not PREVIEW else []
     if binormal is None:
         specs += rmf
     specs += [(m, a, cq, c1) for (m, a, cq), c1 in tries]
@@ -866,7 +866,8 @@ def build_tools(obj):
             if mode == "loft":
                 tool = _loft_tool(spine, wa_, wb_, size)
             elif mode == "rmf":
-                tool = _rmf_loft(spine, wa_, size, 1.0 if fb is not None else max(float(obj.EndScale), 0.01))
+                tool = _rmf_blend(spine, wa_, wb_, size) if fb is not None else \
+                    _rmf_loft(spine, wa_, size, max(float(obj.EndScale), 0.01))
             else:
                 ps = Part.BRepOffsetAPI.MakePipeShell(spine)
                 if mode == "aux":
@@ -1060,6 +1061,40 @@ def _rmf_loft(spine, w, size, scale=1.0):
             sec.rotate(V(), R.Axis, math.degrees(R.Angle))
         sec.translate(c)
         secs.append(sec)
+    return Part.makeLoft(secs, True, False, False, 5)
+
+
+def _rmf_blend(spine, wa, wb, size):
+    """Iki profilli supurme icin burulmasiz cerceveli loft (_rmf_loft'un A -> B harmani): A ve B'nin kenar sayisi esit
+    olmali (oluk 4 kenar + 4 kenar; delik 1 + 1). Her kenar 24 aralikla orneklenir, kesitte kenar basina bir spline
+    olarak harmanlanir: koseler (kenar uclari) korunur. B, sonda tasinan cercevede ifade edilir (_loft_tool gibi), bu
+    yuzden ara kesitler A'nin sekli ile B'nin sekli arasinda burulmasiz gecer."""
+    ea_, eb_ = wa.OrderedEdges, wb.OrderedEdges
+    if len(ea_) != len(eb_):
+        raise ValueError("profiles have a different number of edges")
+    e = spine.Edges[0]
+    K = int(min(max(48, math.ceil(e.Length / (0.25 * size))), 240))
+    F = _stations(e, K)
+    c0, cb, inv = F[0][0], Part.Face(wb).CenterOfMass, F[-1][2].inverted()
+    M = 24
+
+    def samp(ed):
+        pts = [ed.valueAt(ed.FirstParameter + (ed.LastParameter - ed.FirstParameter) * j / M) for j in range(M + 1)]
+        return pts[::-1] if ed.Orientation == "Reversed" else pts
+
+    A = [[p - c0 for p in samp(ed)] for ed in ea_]
+    B = [[inv.multVec(p - cb) for p in samp(ed)] for ed in eb_]
+    secs = [wa]
+    for i in range(1, K):
+        c, t, R = F[i]
+        s = i / float(K)
+        edges = []
+        for ja, jb in zip(A, B):
+            bs = Part.BSplineCurve()
+            bs.interpolate([c + R.multVec(a * (1.0 - s) + b * s) for a, b in zip(ja, jb)])
+            edges.append(bs.toShape())
+        secs.append(Part.Wire(edges))
+    secs.append(wb)
     return Part.makeLoft(secs, True, False, False, 5)
 
 
