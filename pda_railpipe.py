@@ -637,7 +637,9 @@ def build_tools(obj):
     # eslesme + C1 denenir (profil boyu ve iki kati uzakta). Surukleme sirasinda (PREVIEW) hic denenmez.
     frenet = [(("frenet", None, None), c1) for c1 in ((False, True) if PREVIEW else (True, False))]
     frenet += [(("aux", a, True), True) for a in auxs]
-    binor = [(("binormal", binormal, None), c1) for c1 in ((False, True) if PREVIEW else (True, False))] \
+    # binormal + ForceApproxC1 uretilen yuzeyin egri-yuzey (pcurve) kaydi BOP strict kontrolunde
+    # BOPAlgo_InvalidCurveOnSurface veriyor (olculdu); C1 yaklasimi olmadan temiz, bu yuzden once o denenir.
+    binor = [(("binormal", binormal, None), c1) for c1 in (False, True)] \
         if binormal is not None else []
     # serbest uc + (neredeyse) duzlemsel kilavuz: binormal modu kesiti duzlemin normaline gore sabit tutar. CorrectedFrenet
     # cercevesi egrilik isaret degistirdigi (S biciminde kivrim) yerde boruyu eksen etrafinda burar (olculdu: 150 x 30
