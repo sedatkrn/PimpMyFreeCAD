@@ -848,7 +848,14 @@ def build_tools(obj):
     loft_ok = all(circle(a) and circle(b) and (cen(a) - cen(wa)).Length < 1e-6 * size
                   and (cen(b) - cen(wb)).Length < 1e-6 * size for a, b, _ in holes)
     specs = [("loft", None, None, None)] if not PREVIEW and circle(wa) and circle(wb) and loft_ok else []
+    # burulmasiz cerceveli loft (serbest uc; iki profilli supurmede B'ye gecis yok): duzlemsel olmayan kilavuzda
+    # (binormal yok) ilk, duzlemselde binormal sweep'ten sonra yedek
+    rmf = [("rmf", None, None, False)] if (not PREVIEW and fb is None) else []
+    if binormal is None:
+        specs += rmf
     specs += [(m, a, cq, c1) for (m, a, cq), c1 in tries]
+    if binormal is not None:
+        specs += rmf
     err = ["Rail Pipe: the sweep gave no solid"]
 
     def make(spec, wa_, wb_, probe=None):
@@ -858,6 +865,8 @@ def build_tools(obj):
         try:
             if mode == "loft":
                 tool = _loft_tool(spine, wa_, wb_, size)
+            elif mode == "rmf":
+                tool = _rmf_loft(spine, wa_, size, 1.0 if fb is not None else max(float(obj.EndScale), 0.01))
             else:
                 ps = Part.BRepOffsetAPI.MakePipeShell(spine)
                 if mode == "aux":
@@ -1027,6 +1036,30 @@ def _loft_tool(spine, wa, wb, size):
             bs.interpolate([c + R.multVec(a * (1 - s) + b * s) for a, b in zip(pa, pb)], PeriodicFlag=True)
             secs.append(Part.Wire([bs.toShape()]))
     secs.append(wb)
+    return Part.makeLoft(secs, True, False, False, 5)
+
+
+def _rmf_loft(spine, w, size, scale=1.0):
+    """Herhangi bir kapali tel (cok kenarli oluk, delik...) icin burulmasiz (parallel transport) cerceveli loft: kesit
+    kilavuz boyunca K istasyonda, baslangic merkezi etrafinda tasinip doner ve 1 -> scale olcegine olceklenir; tum
+    kesitler ayni donusumle uretildigi icin kenar sayisi ve dikis hizasi ayni kalir. OCCT'nin CorrectedFrenet
+    cercevesi 3B (duzlemsel olmayan) kilavuzda kivrimda burulup C1 yaklasimi 36 mm saptigi icin buna basvurulur."""
+    e = spine.Edges[0]
+    K = int(min(max(48, math.ceil(e.Length / (0.25 * size))), 240))
+    F = _stations(e, K)
+    c0 = F[0][0]
+    secs = [w]
+    for i in range(1, K + 1):
+        c, t, R = F[i]
+        sec = w.copy()
+        sec.translate(-c0)
+        sc = 1.0 + (scale - 1.0) * i / float(K)
+        if abs(sc - 1.0) > 1e-12:
+            sec.scale(sc)
+        if abs(R.Angle) > 1e-12:
+            sec.rotate(V(), R.Axis, math.degrees(R.Angle))
+        sec.translate(c)
+        secs.append(sec)
     return Part.makeLoft(secs, True, False, False, 5)
 
 
