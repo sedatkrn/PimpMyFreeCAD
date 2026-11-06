@@ -191,6 +191,65 @@ def guide_spline(N, ta, tb=None, tension=0.0, ext_a=0.0, ext_b=0.0):
     return bs
 
 
+def guide_smooth(N, ta, tb=None, ext_a=0.0, ext_b=0.0):
+    """Duzgun (C2) kilavuz: dugumlerden kord boyu parametreyle gecen kubik interpolasyon B-spline. Hermite kilavuzun
+    (guide_spline) egriligi dugumlerde sicrar (yalniz C1); genis boruda ic kenar bu yuzden dugumlerde 'koseli' gorunur.
+    Burada egrilik surekli. Dugumler (N[i]) egrinin dugum degerleridir (ext_a / ext_b yoksa getKnots()[i] -> N[i]).
+    ta: A'dan cikis yonu; tb: B'ye giris (ya da serbest ucun) yonu, None: uc dogal. ext_a / ext_b: guide_spline'daki gibi
+    A'nin gerisinden / B'nin otesinden o kadar uzatma (yaklasik duz). Tension kullanilmaz."""
+    Q = list(N)
+    if ext_a > 0:
+        Q.insert(0, N[0] - ta * ext_a)
+    if ext_b > 0 and tb is not None:
+        Q.append(N[-1] + tb * ext_b)
+    prm = [0.0]
+    for i in range(len(Q) - 1):
+        prm.append(prm[-1] + (Q[i + 1] - Q[i]).Length)
+    flags = [True] + [False] * (len(Q) - 2) + [tb is not None]
+    tans = [V(ta)] + [V()] * (len(Q) - 2) + [V(tb) if tb is not None else V()]
+    bs = Part.BSplineCurve()
+    bs.interpolate(Points=Q, Parameters=prm, Tangents=tans, TangentFlags=flags)
+    return bs
+
+
+def guide_curve(obj, N, ta, tb=None, ext_a=0.0, ext_b=0.0):
+    """Nesnenin kilavuz egrisi: SmoothGuide aciksa duzgun (C2), degilse eski Hermite (C1, Tension). Interpolasyon
+    basarisiz olursa (tek aralik gibi uc durumlar) Hermite'e dusulur."""
+    if getattr(obj, "SmoothGuide", False):
+        try:
+            if tb is None and len(N) >= 2 and (N[-1] - N[-2]).Length > 1e-9:
+                tb = (N[-1] - N[-2]).normalize()           # serbest uc: son araligin yonu (Hermite'teki gibi)
+            return guide_smooth(N, ta, tb, ext_a, ext_b)
+        except Exception:
+            pass
+    return guide_spline(N, ta, tb, float(getattr(obj, "Tension", 0.0)), ext_a, ext_b)
+
+
+def _end_dir(obj, N, ta, tb):
+    """Serbest ucun yonu: tb verilmisse (B yuzu) aynen; yoksa son araligin yonu, EndAngle (derece) kadar dondurulmus.
+    Eksen: kilavuz duzlemselse duzlemin normali, degilse son iki aralikin carpimi; isaret: pozitif aci kilavuzun son
+    kivrildigi yone dogru daha cok kivirir. EndAngle 0: eski davranis (son aralikin yonu)."""
+    ang = getattr(obj, "EndAngle", 0.0) or 0.0
+    ang = float(getattr(ang, "Value", ang))
+    if tb is not None or abs(ang) < 1e-9 or len(N) < 2:
+        return tb
+    d = N[-1] - N[-2]
+    if d.Length < 1e-9:
+        return tb
+    d.normalize()
+    prev = (N[-2] - N[-3]) if len(N) >= 3 else V(ta)
+    turn = prev.cross(d)                                   # son kivrilma yonu (kivrilma yoksa ~0)
+    ax = _plane_normal(N, d, 2e-3)                         # (neredeyse) duzlemsel kilavuz: kararli eksen
+    if ax is None:
+        ax = turn if turn.Length > 1e-6 * max(prev.Length, 1.0) else None
+    elif turn.Length > 1e-6 * max(prev.Length, 1.0) and ax.dot(turn) < 0:
+        ax = -ax                                           # pozitif: ayni yone daha cok
+    if ax is None or ax.Length < 1e-9:
+        ax = d.cross(V(1, 0, 0)) if abs(d.x) < 0.9 else d.cross(V(0, 1, 0))
+    ax.normalize()
+    return App.Rotation(ax, ang).multVec(d)
+
+
 def _transport(bs, t0, steps=64):
     """Egri boyunca burulmasiz tasima: baslangic yonu t0'dan sona kadar en kisa donmelerin carpimi (App.Rotation)."""
     a, b = bs.FirstParameter, bs.LastParameter
@@ -451,7 +510,8 @@ def guide_nodes(obj, prof=None):
     pa, pb = prof
     pts = list(obj.GuidePoints)
     ta, tb = _directions(pa, pb, pts, obj.TypeId == "PartDesign::FeatureSubtractivePython", obj.Reversed)
-    return [pa[1]] + pts + ([pb[1]] if pb is not None else []), ta, tb
+    N = [pa[1]] + pts + ([pb[1]] if pb is not None else [])
+    return N, ta, _end_dir(obj, N, ta, tb)
 
 
 def preview_rings(obj, prof, K=48, M=24):
@@ -464,7 +524,7 @@ def preview_rings(obj, prof, K=48, M=24):
     N, ta, tb = res
     pa, pb = prof
     try:
-        bs = guide_spline(N, ta, tb, obj.Tension)
+        bs = guide_curve(obj, N, ta, tb)
         F = _stations(bs.toShape(), K, 4)
         wa = _oriented(pa[0], ta)
         a = [p - pa[1] for p in wa.discretize(M + 1)[:M]]
@@ -519,6 +579,7 @@ def build_tools(obj):
     ta, tb = _directions(pa, pb, pts, obj.TypeId == "PartDesign::FeatureSubtractivePython", obj.Reversed)
     ca = pa[1]
     N = [ca] + pts + ([pb[1]] if pb is not None else [])
+    tb = _end_dir(obj, N, ta, tb)                          # serbest uc: EndAngle kadar dondurulmus uc yonu
     for i in range(len(N) - 1):
         if (N[i + 1] - N[i]).Length < 1e-6:
             yield "Rail Pipe: two guide points are on top of each other"
@@ -529,7 +590,7 @@ def build_tools(obj):
     ea = min(0.5, 0.05 * pa[0].BoundBox.DiagonalLength) if pa[3] else 0.0
     eb = min(0.5, 0.05 * pb[0].BoundBox.DiagonalLength) if pb is not None and pb[3] else 0.0
     fb = pb
-    bs = guide_spline(N, ta, tb, obj.Tension, ea, eb)
+    bs = guide_curve(obj, N, ta, tb, ea, eb)
     spine = Part.Wire(bs.toShape())
     global LAST_BEND
     LAST_BEND = (bs, pa[0], ca)
@@ -554,7 +615,7 @@ def build_tools(obj):
     box = spine.BoundBox
     box.enlarge(2.0 * max(wa.BoundBox.DiagonalLength, wb.BoundBox.DiagonalLength))
     mid = bs.value((bs.FirstParameter + bs.LastParameter) / 2)
-    binormal = _plane_normal([ca] + N[1:] + [end], ta)
+    binormal = _plane_normal([ca] + N[1:] + [end], ta, 2e-3)   # (neredeyse) duzlemsel kilavuz: duzlem normali
     wb_dir = tb if fb is not None else R.multVec(ta)      # B telinin donus yonu (ic tel de ayni yone)
     # sirayla denenir, gecerli ve egrinin cevresinde kalan ilk sonuc alinir:
     # 1. CorrectedFrenet + C1 yaklasim (setMaxDegree 3, 1000 parca, 1e-4 tolerans): C1 yuzey. Thickness / fillet /
@@ -574,9 +635,15 @@ def build_tools(obj):
     auxs = [] if PREVIEW else [a for a in (_aux_spine(bs, ta, first - ca, size * k) for k in (1.0, 2.0)) if a]
     # Yardimci omurga OCCT'de kirilgan: egrisel eslesme kapaliyken bazen dakikalarca takiliyor; yalniz egrisel
     # eslesme + C1 denenir (profil boyu ve iki kati uzakta). Surukleme sirasinda (PREVIEW) hic denenmez.
-    tries = [(("frenet", None, None), c1) for c1 in ((False, True) if PREVIEW else (True, False))]
-    tries += [(("aux", a, True), True) for a in auxs]
-    tries += [(("binormal", binormal, None), c1) for c1 in (True, False)] if binormal is not None else []
+    frenet = [(("frenet", None, None), c1) for c1 in ((False, True) if PREVIEW else (True, False))]
+    frenet += [(("aux", a, True), True) for a in auxs]
+    binor = [(("binormal", binormal, None), c1) for c1 in ((False, True) if PREVIEW else (True, False))] \
+        if binormal is not None else []
+    # serbest uc + (neredeyse) duzlemsel kilavuz: binormal modu kesiti duzlemin normaline gore sabit tutar. CorrectedFrenet
+    # cercevesi egrilik isaret degistirdigi (S biciminde kivrim) yerde boruyu eksen etrafinda burar (olculdu: 150 x 30
+    # profilde +-0.5 derece, kalinlik 30 -> 31.3 mm; kenarda kirisiklik) ve uc acisi verilince 2.7 derecelik burulma ve
+    # kesit alaninda %20 sisme yapti. Iki profilli supurme eskisi gibi Frenet'le baslar (binormal orada bazen gecersiz).
+    tries = (binor + frenet) if (fb is None and binor) else (frenet + binor)
     global LAST_MODE
     # 0. iki ucu daire olan boru: kendi burulmasiz cercevemizle daire kesitler + loft (asagida _loft_tool). En
     #    duzgunu: motor-test borulari r=20 +- 0.025 mm, normal sapmasi < 0.4 derece, C2, boyunca ~50 kontrol noktasi
@@ -758,6 +825,18 @@ def _shell_props(obj):
         obj.WallThickness = 2.0
 
 
+def _guide_props(obj):
+    """SmoothGuide / EndAngle (sonradan eklendi: eski nesnelerde belge acilinca ya da duzenlenirken eklenir; kapali /
+    0 olduklari icin kayitli sekil degismez)."""
+    if "SmoothGuide" not in obj.PropertiesList:
+        obj.addProperty("App::PropertyBool", "SmoothGuide", "Rail",
+                        "Smooth (C2) guide curve through the points. Off: the older curve (C1) shaped by Tension")
+    if "EndAngle" not in obj.PropertiesList:
+        obj.addProperty("App::PropertyFloat", "EndAngle", "Rail",
+                        "Free end: turns the end direction by this angle in degrees (positive: bends further the way "
+                        "the guide already bends). 0: the end follows the last span")
+
+
 class RailPipe:
     """Rail Pipe (FeatureAdditivePython) / Rail Groove (FeatureSubtractivePython) nesnesinin Proxy'si."""
 
@@ -771,6 +850,7 @@ class RailPipe:
         obj.addProperty("App::PropertyFloat", "EndScale", "Rail", "Size of the free end relative to A").EndScale = 1.0
         obj.addProperty("App::PropertyBool", "Reversed", "Rail", "Leave A to the other side")
         _shell_props(obj)
+        _guide_props(obj)
         if not is_part(obj):                               # Part surumunde boolean yok: Refine gereksiz
             if "Refine" not in obj.PropertiesList:         # PartDesign'in kendi Refine ozelligi (yoksa ekle)
                 obj.addProperty("App::PropertyBool", "Refine", "Base", "Merge coplanar faces of the result")
@@ -817,6 +897,7 @@ class RailPipe:
 
     def onDocumentRestored(self, obj):
         _shell_props(obj)
+        _guide_props(obj)
 
     def dumps(self):
         return None

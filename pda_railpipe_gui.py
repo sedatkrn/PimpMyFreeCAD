@@ -65,6 +65,7 @@ def _set(coord, node, P, points=True):
 class Editor(object):
     def __init__(self, obj):
         import pda_common
+        rp._guide_props(obj)                               # eski nesnelerde SmoothGuide / EndAngle yoksa ekle
         self.obj, self.doc = obj, obj.Document
         self.view = Gui.ActiveDocument.ActiveView
         self.gp = obj.getGlobalPlacement() if hasattr(obj, "getGlobalPlacement") else App.Placement()
@@ -133,7 +134,7 @@ class Editor(object):
                 _set(c, n, [], n is not self.c_line)
             return
         N, ta, tb = res
-        bs = self.bs = rp.guide_spline(N, ta, tb, self.obj.Tension)
+        bs = self.bs = rp.guide_curve(self.obj, N, ta, tb)
         a, b = bs.FirstParameter, bs.LastParameter
         self.curve = [(a + (b - a) * k / 200.0,) for k in range(201)]
         self.curve = [(u, self.world(bs.value(u))) for (u,) in self.curve]
@@ -390,7 +391,7 @@ class Editor(object):
             i = min(self.sel, n - 2)
         else:
             i = max(range(n - 1), key=lambda k: (N[k + 1] - N[k]).Length)
-        bs = rp.guide_spline(N, ta, tb, self.obj.Tension)
+        bs = rp.guide_curve(self.obj, N, ta, tb)
         K = bs.getKnots()
         u = (K[i] + K[i + 1]) / 2
         if self.span is not None and self.span[0] < len(K) - 1:   # secili parca: tiklanan yere
@@ -467,8 +468,8 @@ class Editor(object):
 
 
 class Panel(object):
-    """Gorev paneli: secili nokta X / Y / Z, nokta ekle / sil, Move neighbors + Elasticity, Tension, EndScale,
-    Reversed."""
+    """Gorev paneli: secili nokta X / Y / Z, nokta ekle / sil, Move neighbors + Elasticity, Smooth guide, Tension, EndScale,
+    End angle, Reversed."""
 
     def __init__(self, ed):
         self.ed = ed
@@ -508,21 +509,36 @@ class Panel(object):
         self.elastic.setValue(ed.elastic)
         self.elastic.valueChanged.connect(lambda v: setattr(self.ed, "elastic", float(v)))
         grid.addWidget(self.elastic, 1, 1)
-        grid.addWidget(QtWidgets.QLabel(T("Tension")), 2, 0)
+        self.smooth = QtWidgets.QCheckBox(T("Smooth guide (C2)"))
+        self.smooth.setToolTip(T("Smooth curve through the points: the curvature has no jumps at the points, so a wide "
+                                 "pipe has no corners on its inner edge. Off: the older curve shaped by Tension"))
+        self.smooth.setChecked(bool(ed.obj.SmoothGuide))
+        self.smooth.toggled.connect(self._smooth_toggled)
+        grid.addWidget(self.smooth, 2, 0, 1, 2)
+        grid.addWidget(QtWidgets.QLabel(T("Tension")), 3, 0)
         self.tension = self._spin(0.0, 1.0, 2, "", 0.05)
         self.tension.setValue(ed.obj.Tension)
+        self.tension.setEnabled(not ed.obj.SmoothGuide)
         self.tension.valueChanged.connect(lambda v: self.ed.set_prop("Tension", float(v)))
-        grid.addWidget(self.tension, 2, 1)
-        grid.addWidget(QtWidgets.QLabel(T("End scale")), 3, 0)
+        grid.addWidget(self.tension, 3, 1)
+        grid.addWidget(QtWidgets.QLabel(T("End scale")), 4, 0)
         self.scale = self._spin(0.01, 100.0, 3, " x", 0.05)
         self.scale.setValue(ed.obj.EndScale)
         self.scale.setEnabled(ed.free_end())
         self.scale.valueChanged.connect(lambda v: self.ed.set_prop("EndScale", float(v)))
-        grid.addWidget(self.scale, 3, 1)
+        grid.addWidget(self.scale, 4, 1)
+        grid.addWidget(QtWidgets.QLabel(T("End angle")), 5, 0)
+        self.endang = self._spin(-180.0, 180.0, 2, " \u00b0", 1.0)
+        self.endang.setToolTip(T("Free end: turns the end direction (and the end face) by this angle. Positive: bends "
+                                 "further the way the guide already bends. 0: the end follows the last span"))
+        self.endang.setValue(float(ed.obj.EndAngle))
+        self.endang.setEnabled(ed.free_end())
+        self.endang.valueChanged.connect(lambda v: self.ed.set_prop("EndAngle", float(v)))
+        grid.addWidget(self.endang, 5, 1)
         self.rev = QtWidgets.QCheckBox(T("Reversed"))
         self.rev.setChecked(bool(ed.obj.Reversed))
         self.rev.toggled.connect(lambda on: self.ed.set_prop("Reversed", bool(on)))
-        grid.addWidget(self.rev, 4, 0, 1, 2)
+        grid.addWidget(self.rev, 6, 0, 1, 2)
         lay.addWidget(g)
         import pda_commands                                # secenek: sonraki Rail Pipe'lar (bu boruyu degistirmez)
         g = QtWidgets.QGroupBox(T("Options"))
@@ -551,6 +567,10 @@ class Panel(object):
         lay.addWidget(g)
         lay.addStretch()
         self.sync()
+
+    def _smooth_toggled(self, on):
+        self.tension.setEnabled(not on)                    # Tension yalniz eski (Hermite) kilavuzda
+        self.ed.set_prop("SmoothGuide", bool(on))
 
     @staticmethod
     def _spin(lo, hi, dec, suffix, step=1.0):
