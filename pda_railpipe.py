@@ -137,6 +137,78 @@ def profile(link, glob=False):
     return f.OuterWire, c, n, bool(sh.Solids)
 
 
+def _inner_loops(sh):
+    """Sekildeki kapali tellerden, en buyuk (dis) telin dogrudan icindekiler (delikler). Ic ice ucuncu kat (deligin
+    icindeki ada) atlanir: yalniz tam bir tel icinde olanlar delik sayilir."""
+    ws = [w for w in sh.Wires if w.isClosed()]
+    if len(ws) < 2:
+        return []
+    faces = []
+    for w in ws:
+        try:
+            faces.append(Part.Face(w))
+        except Exception:
+            faces.append(None)
+    outer = max(range(len(ws)), key=lambda i: ws[i].BoundBox.DiagonalLength)
+    if faces[outer] is None:
+        return []
+    holes = []
+    for i, w in enumerate(ws):
+        if i == outer or faces[i] is None:
+            continue
+        p = w.Vertexes[0].Point
+        depth = sum(1 for j, f in enumerate(faces) if j != i and f is not None and f.isInside(p, 1e-6, True))
+        if depth == 1 and faces[outer].isInside(p, 1e-6, True):
+            holes.append(w)
+    return holes
+
+
+def profile_holes(link, glob=False):
+    """profile()'in dis teline gore delikleri: kapali tel listesi (profille ayni koordinatta). Sketch: yalniz Make
+    Internals aciksa dis telin icindeki kapali teller; yuz: yuzun ic telleri; kenar secimi: yok."""
+    if not link or link[0] is None:
+        return []
+    o, subs = link[0], list(link[1] or [])
+    try:
+        if _is_sketch(o):
+            if not getattr(o, "MakeInternals", False):
+                return []
+            return _inner_loops(_shape(o, None, glob))
+        sh = _shape(o, None, glob)
+        if subs and subs[0].startswith("Edge"):
+            return []
+        f = None
+        if subs:
+            f = _shape(o, subs[0], glob)
+        elif len(sh.Faces) == 1:
+            f = sh.Faces[0]
+        elif not sh.Faces:                                 # yuzu olmayan teller (sketch'in Binder'i): sketch gibi
+            src = o.Support[0][0] if getattr(o, "Support", None) else None
+            if src is not None and _is_sketch(src) and not getattr(src, "MakeInternals", False):
+                return []
+            return _inner_loops(sh)
+        if f is None or f.ShapeType != "Face":
+            return []
+        return [w for w in f.Wires if not w.isSame(f.OuterWire)]
+    except Exception:
+        return []
+
+
+def _inside_pt(w):
+    """Kapali telin yuzunun icinde bir nokta (merkez disarida kalirsa, ornek noktalarindan biri)."""
+    f = Part.Face(w)
+    c = f.CenterOfMass
+    if f.isInside(c, 1e-6, True):
+        return c
+    u0, u1, v0, v1 = f.ParameterRange
+    for i in range(1, 8):
+        for j in range(1, 8):
+            q = f.Surface.value(u0 + (u1 - u0) * i / 8.0, v0 + (v1 - v0) * j / 8.0)
+            if f.isInside(q, 1e-6, True):
+                return q
+    return c
+
+
 def face_frame(f):
     """Yuzun merkezi ve (katinin disina bakan) normali."""
     c = f.CenterOfMass
@@ -617,6 +689,39 @@ def build_tools(obj):
     mid = bs.value((bs.FirstParameter + bs.LastParameter) / 2)
     binormal = _plane_normal([ca] + N[1:] + [end], ta, 2e-3)   # (neredeyse) duzlemsel kilavuz: duzlem normali
     wb_dir = tb if fb is not None else R.multVec(ta)      # B telinin donus yonu (ic tel de ayni yone)
+    # delikler (sketch'te Make Internals, yuzun ic telleri): ayni yontemle supurulur, borudan cikarilir (Shell'in ic
+    # borusu gibi). Iki profilde delik sayisi esit olmali; alana (sonra merkeze uzakliga) gore eslesir.
+    holes = []
+    ha = profile_holes(obj.StartFace, g)
+    hb = profile_holes(obj.EndFace, g) if fb is not None else []
+    if ha or hb:
+        if fb is not None and len(ha) != len(hb):
+            yield "Rail Pipe: the start and end profiles must have the same number of holes"
+            return
+        srt = lambda c0: (lambda w: (-round(Part.Face(w).Area, 6), (Part.Face(w).CenterOfMass - c0).Length))
+        ha.sort(key=srt(pa[1]))
+        if fb is not None:
+            hb.sort(key=srt(pb[1]))
+        for i, h in enumerate(ha):
+            try:
+                ia_ = _oriented(h, ta).copy()
+                ia_.translate(-ta * ea)
+                if fb is not None:
+                    ib_ = _oriented(hb[i], tb).copy()
+                    ib_.translate(tb * eb)
+                else:
+                    ib_ = ia_.copy()
+                    ib_.translate(-ca)
+                    ib_.rotate(V(), R.Axis, math.degrees(R.Angle))
+                    ib_.scale(max(obj.EndScale, 0.01))
+                    ib_.translate(N[-1])
+                f0 = ia_.OrderedEdges[0].Vertexes[0].Point
+                ib_ = _start_near(ib_, R.multVec(f0 - ca) * (obj.EndScale if fb is None else 1.0) + end)
+                probe = _inside_pt(ia_) + ta * (0.02 * max(ia_.BoundBox.DiagonalLength, 1.0))
+                holes.append((ia_, ib_, probe))
+            except Exception:
+                yield "Rail Pipe: the hole profile could not be read"
+                return
     # sirayla denenir, gecerli ve egrinin cevresinde kalan ilk sonuc alinir:
     # 1. CorrectedFrenet + C1 yaklasim (setMaxDegree 3, 1000 parca, 1e-4 tolerans): C1 yuzey. Thickness / fillet /
     #    ofset icin sart: C1'siz yuzey kilavuz noktalarinda parametrik C0 kaliyor (CorrectedFrenet cercevesi
@@ -652,12 +757,17 @@ def build_tools(obj):
     #    (supurme 210: ekranda yamali parliyordu), ~0.06 s. Boyu degisen elipsler arasindaki loft ofsette
     #    'command not done' verdi: obur tek kenarli profiller supurmeyle kalir.
     circle = lambda w: len(w.Edges) == 1 and "Circle" in w.Edges[0].Curve.TypeId
-    specs = [("loft", None, None, None)] if not PREVIEW and circle(wa) and circle(wb) else []
+    cen = lambda w: Part.Face(w).CenterOfMass
+    # loft yalniz delik yoksa ya da delikler es merkezli dairelerse (loft kesiti kilavuz uzerine ortalar)
+    loft_ok = all(circle(a) and circle(b) and (cen(a) - cen(wa)).Length < 1e-6 * size
+                  and (cen(b) - cen(wb)).Length < 1e-6 * size for a, b, _ in holes)
+    specs = [("loft", None, None, None)] if not PREVIEW and circle(wa) and circle(wb) and loft_ok else []
     specs += [(m, a, cq, c1) for (m, a, cq), c1 in tries]
     err = ["Rail Pipe: the sweep gave no solid"]
 
-    def make(spec, wa_, wb_):
-        """Bir yontemle (spec) wa_ -> wb_ katisi: gecerli, disari donuk ve egrinin cevresinde; olmazsa None."""
+    def make(spec, wa_, wb_, probe=None):
+        """Bir yontemle (spec) wa_ -> wb_ katisi: gecerli, disari donuk ve egrinin cevresinde; olmazsa None.
+        probe: katinin icinde bir nokta (kilavuzdan uzak delik borusu icin; yoksa kilavuzun ortasi)."""
         mode, arg, cureq, c1 = spec
         try:
             if mode == "loft":
@@ -687,7 +797,7 @@ def build_tools(obj):
         if tool is None or tool.isNull() or not tool.Solids:
             return None
         tool = tool.Solids[0]
-        if not PREVIEW and not tool.isInside(mid, 1e-7, True):   # ters yuzlu (ici disina donuk) cikabiliyor:
+        if not PREVIEW and not tool.isInside(mid if probe is None else probe, 1e-7, True):   # ters yuzlu (ici disina donuk) cikabiliyor:
             tool.reverse()                                 # cevir (onizlemede gerekmez: yalniz boolean icin)
         if tool.isValid() and (PREVIEW or box.isInside(_tight_box(tool))):   # onizleme: kutu denetimi yok (hiz)
             return tool
@@ -709,22 +819,29 @@ def build_tools(obj):
         except Exception:
             yield "Rail Pipe: the wall is too thick for the profile"
             return
+    cuts = ([(inner[0], inner[1], None)] if inner is not None else []) + holes
     given = False
     for spec in specs:
         tool = make(spec, wa, wb)
         if tool is None:
             continue
-        if inner is not None:                              # ayni yontemle ic boru, dis borudan cikar
-            hole = make(spec, inner[0], inner[1])
+        ok = True
+        for a_, b_, pr in cuts:                            # ayni yontemle ic boru / delik borulari, dis borudan cikar
+            hole = make(spec, a_, b_, pr)
             if hole is None:
-                continue
+                ok = False
+                break
             try:
                 tool = tool.cut(hole)
             except Exception:
-                continue
+                ok = False
+                break
             if tool.isNull() or not tool.Solids or not tool.isValid():
-                continue
+                ok = False
+                break
             tool = tool.Solids[0] if len(tool.Solids) == 1 else tool
+        if not ok:
+            continue
         LAST_MODE = spec[:3] if spec[0] != "loft" else ("loft", None, None)
         yield tool
         given = True
@@ -915,6 +1032,26 @@ class ViewProviderRailPipe:
 
     def attach(self, vobj):
         self.Object = vobj.Object
+
+    def claimChildren(self):
+        """Agacta profil sketch'i (ve Binder'i) Rail Pipe'in altinda gorunur (Pad'deki gibi). Yalniz ayni Body'nin
+        PartDesign profilleri: Part surumunde profil baska bir nesnenin yuzu olabilir."""
+        obj = getattr(self, "Object", None)
+        out = []
+        try:
+            if obj is None or is_part(obj):
+                return out
+            body = obj.getParentGeoFeatureGroup()
+            for link in (obj.StartFace, obj.EndFace):
+                o = link[0] if link else None
+                if o is None or o in out:
+                    continue
+                if (_is_sketch(o) or o.TypeId == "PartDesign::SubShapeBinder") and \
+                        o.getParentGeoFeatureGroup() == body:
+                    out.append(o)
+        except Exception:
+            pass
+        return out
 
     def doubleClicked(self, vobj):
         import FreeCADGui as Gui
