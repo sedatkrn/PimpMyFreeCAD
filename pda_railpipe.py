@@ -23,7 +23,8 @@ LAST_MODE = None          # son supurmenin yontemi (tani)
 # C2 kilavuzda Tension 0 bile bu kadar kirisa cekim uygular: saf kenetli kubik spline uca yakin yaricapi sert daraltiyordu
 # (olculdu: 200 x 80 profilde kilavuz yaricapi 57 mm -> ic kenar katlandi, BOP SelfIntersect); 0.3'te 141 mm (eski Hermite 169).
 SMOOTH_BASE = 0.3
-C1_APPROX = (3, 1000, (1e-4, 1e-4, 1e-2))   # C1 yaklasim: en yuksek derece, en cok parca, (3B, sinir, aci) toleransi
+C1_APPROX = (3, 200, (1e-4, 1e-4, 1e-2))   # C1 yaklasim: en yuksek derece, en cok parca, (3B, sinir, aci) toleransi
+# 200 parca: tutan durumlarda 1000 ile ayni sonuc; tutmayan 3B kilavuzda (kenar toleransi 36 mm) basarisiz deneme 16 s -> 4 s
 LAST_BEND = None          # son kilavuz: (egri, A teli, A merkezi); hata metni icin
 
 
