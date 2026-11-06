@@ -359,4 +359,10 @@ TR = {
         'Uç açısı',
     'Free end: turns the end direction (and the end face) by this angle. Positive: bends further the way the guide already bends. 0: the end follows the last span':
         'Serbest uç: uç yönünü (ve uç yüzünü) bu açı kadar döndürür. Pozitif: kılavuzun zaten kıvrıldığı yöne doğru daha çok kıvırır. 0: uç, son aralığı izler',
+    'End pitch':
+        'Uç eğimi',
+    'Free end: tilts the end direction out of the plane the guide bends in. Use it with End angle to aim the end in any direction':
+        'Serbest uç: uç yönünü kılavuzun kıvrıldığı düzlemden dışarı yatırır. Uç açısıyla birlikte ucu istenen yöne çevirir',
+    'Pulls the guide toward the straight lines between the points. Higher: less bulge between the points':
+        'Kılavuzu noktalar arasındaki düz çizgilere doğru çeker. Yükseldikçe noktalar arasındaki şişme azalır',
 }

@@ -264,12 +264,16 @@ def guide_spline(N, ta, tb=None, tension=0.0, ext_a=0.0, ext_b=0.0):
     return bs
 
 
-def guide_smooth(N, ta, tb=None, ext_a=0.0, ext_b=0.0):
+def guide_smooth(N, ta, tb=None, ext_a=0.0, ext_b=0.0, tension=0.0):
     """Duzgun (C2) kilavuz: dugumlerden kord boyu parametreyle gecen kubik interpolasyon B-spline. Hermite kilavuzun
     (guide_spline) egriligi dugumlerde sicrar (yalniz C1); genis boruda ic kenar bu yuzden dugumlerde 'koseli' gorunur.
     Burada egrilik surekli. Dugumler (N[i]) egrinin dugum degerleridir (ext_a / ext_b yoksa getKnots()[i] -> N[i]).
     ta: A'dan cikis yonu; tb: B'ye giris (ya da serbest ucun) yonu, None: uc dogal. ext_a / ext_b: guide_spline'daki gibi
-    A'nin gerisinden / B'nin otesinden o kadar uzatma (yaklasik duz). Tension kullanilmaz."""
+    A'nin gerisinden / B'nin otesinden o kadar uzatma (yaklasik duz).
+    tension 0..1: egriyi kirisa (dugumleri birlestiren cokgene) cekerek aralik ortalarindaki 'gobek'i azaltir. Her
+    aralikta egrinin 1/3 ve 2/3 noktalari kirisin ayni noktalariyla tension kadar karistirilir, egri bu ek
+    noktalardan da gecerek yeniden enterpole edilir (hala C2). Olculdu: son aralikta kirisa sapma 25.6 mm ->
+    18.0 (0.3) -> 8.9 mm (1.0)."""
     Q = list(N)
     if ext_a > 0:
         Q.insert(0, N[0] - ta * ext_a)
@@ -279,10 +283,28 @@ def guide_smooth(N, ta, tb=None, ext_a=0.0, ext_b=0.0):
     for i in range(len(Q) - 1):
         prm.append(prm[-1] + (Q[i + 1] - Q[i]).Length)
     flags = [True] + [False] * (len(Q) - 2) + [tb is not None]
-    tans = [V(ta)] + [V()] * (len(Q) - 2) + [V(tb) if tb is not None else V()]
-    bs = Part.BSplineCurve()
-    bs.interpolate(Points=Q, Parameters=prm, Tangents=tans, TangentFlags=flags)
-    return bs
+
+    def fit(P, par):
+        k = len(P)
+        tans = [V(ta)] + [V()] * (k - 2) + [V(tb) if tb is not None else V()]
+        fl = [True] + [False] * (k - 2) + [tb is not None]
+        bs = Part.BSplineCurve()
+        bs.interpolate(Points=P, Parameters=par, Tangents=tans, TangentFlags=fl)
+        return bs
+
+    bs = fit(Q, prm)
+    k = min(max(float(tension), 0.0), 1.0)
+    if k <= 1e-9 or len(Q) < 3:
+        return bs
+    P2, par2 = [Q[0]], [prm[0]]
+    for i in range(len(Q) - 1):
+        for f in (1.0 / 3.0, 2.0 / 3.0):
+            u = prm[i] + (prm[i + 1] - prm[i]) * f
+            P2.append(bs.value(u) * (1.0 - k) + (Q[i] + (Q[i + 1] - Q[i]) * f) * k)
+            par2.append(u)
+        P2.append(Q[i + 1])
+        par2.append(prm[i + 1])
+    return fit(P2, par2)
 
 
 def guide_curve(obj, N, ta, tb=None, ext_a=0.0, ext_b=0.0):
@@ -292,19 +314,28 @@ def guide_curve(obj, N, ta, tb=None, ext_a=0.0, ext_b=0.0):
         try:
             if tb is None and len(N) >= 2 and (N[-1] - N[-2]).Length > 1e-9:
                 tb = (N[-1] - N[-2]).normalize()           # serbest uc: son araligin yonu (Hermite'teki gibi)
-            return guide_smooth(N, ta, tb, ext_a, ext_b)
+            return guide_smooth(N, ta, tb, ext_a, ext_b, float(getattr(obj, "Tension", 0.0)))
         except Exception:
             pass
     return guide_spline(N, ta, tb, float(getattr(obj, "Tension", 0.0)), ext_a, ext_b)
 
 
+def _end_angles(obj):
+    """(EndAngle, EndPitch) derece olarak."""
+    out = []
+    for name in ("EndAngle", "EndPitch"):
+        v = getattr(obj, name, 0.0) or 0.0
+        out.append(float(getattr(v, "Value", v)))
+    return out
+
+
 def _end_dir(obj, N, ta, tb):
-    """Serbest ucun yonu: tb verilmisse (B yuzu) aynen; yoksa son araligin yonu, EndAngle (derece) kadar dondurulmus.
-    Eksen: kilavuz duzlemselse duzlemin normali, degilse son iki aralikin carpimi; isaret: pozitif aci kilavuzun son
-    kivrildigi yone dogru daha cok kivirir. EndAngle 0: eski davranis (son aralikin yonu)."""
-    ang = getattr(obj, "EndAngle", 0.0) or 0.0
-    ang = float(getattr(ang, "Value", ang))
-    if tb is not None or abs(ang) < 1e-9 or len(N) < 2:
+    """Serbest ucun yonu: tb verilmisse (B yuzu) aynen; yoksa son araligin yonu, once EndAngle sonra EndPitch (derece)
+    kadar dondurulmus. EndAngle: kilavuzun kivrilma duzleminde. Eksen: kilavuz duzlemselse duzlemin normali, degilse son
+    iki aralikin carpimi; isaret: pozitif aci kilavuzun son kivrildigi yone dogru daha cok kivirir. EndPitch: bu
+    duzlemden disari egim (pozitif: eksenin yonune). Ikisi 0: eski davranis (son aralikin yonu)."""
+    ang, pitch = _end_angles(obj)
+    if tb is not None or (abs(ang) < 1e-9 and abs(pitch) < 1e-9) or len(N) < 2:
         return tb
     d = N[-1] - N[-2]
     if d.Length < 1e-9:
@@ -320,7 +351,13 @@ def _end_dir(obj, N, ta, tb):
     if ax is None or ax.Length < 1e-9:
         ax = d.cross(V(1, 0, 0)) if abs(d.x) < 0.9 else d.cross(V(0, 1, 0))
     ax.normalize()
-    return App.Rotation(ax, ang).multVec(d)
+    if abs(ang) > 1e-9:
+        d = App.Rotation(ax, ang).multVec(d)
+    if abs(pitch) > 1e-9:
+        u = d.cross(ax)                                    # d'yi ax yonune yatiran eksen
+        if u.Length > 1e-9:
+            d = App.Rotation(u.normalize(), pitch).multVec(d)
+    return d
 
 
 def _transport(bs, t0, steps=64):
@@ -689,6 +726,8 @@ def build_tools(obj):
     box.enlarge(2.0 * max(wa.BoundBox.DiagonalLength, wb.BoundBox.DiagonalLength))
     mid = bs.value((bs.FirstParameter + bs.LastParameter) / 2)
     binormal = _plane_normal([ca] + N[1:] + [end], ta, 2e-3)   # (neredeyse) duzlemsel kilavuz: duzlem normali
+    if abs(_end_angles(obj)[1]) > 1e-9:
+        binormal = None                                    # uc duzlemden egik: kilavuz duzlemsel degil
     wb_dir = tb if fb is not None else R.multVec(ta)      # B telinin donus yonu (ic tel de ayni yone)
     # delikler (sketch'te Make Internals, yuzun ic telleri): ayni yontemle supurulur, borudan cikarilir (Shell'in ic
     # borusu gibi). Iki profilde delik sayisi esit olmali; alana (sonra merkeze uzakliga) gore eslesir.
@@ -965,11 +1004,14 @@ def _shell_props(obj):
 
 
 def _guide_props(obj):
-    """SmoothGuide / EndAngle (sonradan eklendi: eski nesnelerde belge acilinca ya da duzenlenirken eklenir; kapali /
+    """SmoothGuide / EndAngle / EndPitch (sonradan eklendi: eski nesnelerde belge acilinca ya da duzenlenirken eklenir; kapali /
     0 olduklari icin kayitli sekil degismez)."""
     if "SmoothGuide" not in obj.PropertiesList:
         obj.addProperty("App::PropertyBool", "SmoothGuide", "Rail",
                         "Smooth (C2) guide curve through the points. Off: the older curve (C1) shaped by Tension")
+    if "EndPitch" not in obj.PropertiesList:
+        obj.addProperty("App::PropertyFloat", "EndPitch", "Rail",
+                        "Free end: tilts the end direction out of the plane the guide bends in by this angle in degrees")
     if "EndAngle" not in obj.PropertiesList:
         obj.addProperty("App::PropertyFloat", "EndAngle", "Rail",
                         "Free end: turns the end direction by this angle in degrees (positive: bends further the way "

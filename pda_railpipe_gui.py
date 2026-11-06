@@ -517,8 +517,9 @@ class Panel(object):
         grid.addWidget(self.smooth, 2, 0, 1, 2)
         grid.addWidget(QtWidgets.QLabel(T("Tension")), 3, 0)
         self.tension = self._spin(0.0, 1.0, 2, "", 0.05)
+        self.tension.setToolTip(T("Pulls the guide toward the straight lines between the points. Higher: less bulge "
+                                  "between the points"))
         self.tension.setValue(ed.obj.Tension)
-        self.tension.setEnabled(not ed.obj.SmoothGuide)
         self.tension.valueChanged.connect(lambda v: self.ed.set_prop("Tension", float(v)))
         grid.addWidget(self.tension, 3, 1)
         grid.addWidget(QtWidgets.QLabel(T("End scale")), 4, 0)
@@ -535,10 +536,18 @@ class Panel(object):
         self.endang.setEnabled(ed.free_end())
         self.endang.valueChanged.connect(lambda v: self.ed.set_prop("EndAngle", float(v)))
         grid.addWidget(self.endang, 5, 1)
+        grid.addWidget(QtWidgets.QLabel(T("End pitch")), 6, 0)
+        self.endpitch = self._spin(-180.0, 180.0, 2, " \u00b0", 1.0)
+        self.endpitch.setToolTip(T("Free end: tilts the end direction out of the plane the guide bends in. Use it with "
+                                   "End angle to aim the end in any direction"))
+        self.endpitch.setValue(float(getattr(ed.obj, "EndPitch", 0.0)))
+        self.endpitch.setEnabled(ed.free_end())
+        self.endpitch.valueChanged.connect(lambda v: self.ed.set_prop("EndPitch", float(v)))
+        grid.addWidget(self.endpitch, 6, 1)
         self.rev = QtWidgets.QCheckBox(T("Reversed"))
         self.rev.setChecked(bool(ed.obj.Reversed))
         self.rev.toggled.connect(lambda on: self.ed.set_prop("Reversed", bool(on)))
-        grid.addWidget(self.rev, 6, 0, 1, 2)
+        grid.addWidget(self.rev, 7, 0, 1, 2)
         lay.addWidget(g)
         import pda_commands                                # secenek: sonraki Rail Pipe'lar (bu boruyu degistirmez)
         g = QtWidgets.QGroupBox(T("Options"))
@@ -569,7 +578,6 @@ class Panel(object):
         self.sync()
 
     def _smooth_toggled(self, on):
-        self.tension.setEnabled(not on)                    # Tension yalniz eski (Hermite) kilavuzda
         self.ed.set_prop("SmoothGuide", bool(on))
 
     @staticmethod
