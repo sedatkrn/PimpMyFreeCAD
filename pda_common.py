@@ -18,6 +18,16 @@ def _param():
     return App.ParamGet(PARAM)
 
 
+def btn_flags(*buttons):
+    """Task panel icin QDialogButtonBox dugmelerini tamsayi bayragina cevirir (getStandardButtons).
+    Yeni PySide6'da (FreeCAD 27.x) QDialogButtonBox.Ok bir enum nesnesidir, int() onu cevirmez; .value tamsayiyi verir.
+    Eski surumlerde dugme zaten tamsayidir."""
+    v = 0
+    for b in buttons:
+        v |= int(getattr(b, "value", b))
+    return v
+
+
 def _sep(*nodes):
     s = coin.SoSeparator()
     for n in nodes:

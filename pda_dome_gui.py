@@ -79,7 +79,9 @@ class Panel(object):
         self.status.setText("\n".join(lines))
 
     def getStandardButtons(self):
-        return int(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        import pda_common
+        B = QtWidgets.QDialogButtonBox
+        return pda_common.btn_flags(B.Ok, B.Cancel)
 
     def accept(self):
         self.timer.stop()

@@ -943,7 +943,8 @@ class Panel(object):
                 b.blockSignals(False)
 
     def getStandardButtons(self):
-        return int(QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel)
+        B = QtWidgets.QDialogButtonBox
+        return sm.btn_flags(B.Ok, B.Cancel)
 
     def accept(self):
         self.ed.finish(True)

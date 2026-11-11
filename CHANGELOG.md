@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Fixed `TypeError: int() argument must be ... not 'StandardButton'` in the Rail Pipe, Magic Loft and Dome task panels on
+  newer PySide6 (FreeCAD 27.x), where `QDialogButtonBox.Ok` is an enum object instead of an int (issue #2).
+
 ## 0.3.0 (2026-11-06)
 
 - Rail Pipe / Rail Groove **Curve type**: Hermite (C1), Smooth (C2) or B-spline (control points) guide. **Tension** also works
