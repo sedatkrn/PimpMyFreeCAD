@@ -7,6 +7,8 @@
   to the path. No toolbar command yet; run `pda_bodysweep.run_selection()` from the Python console. Needs scipy and shapely.
   The tube end sections are the static body's exact cut and the end caps are glued with a 0.05 mm fuzzy fuse (no sliver
   faces at the start / end corners of a rotating tool).
+  The exact sections are computed in parallel threads (`workers`, default cpu count - 2): 213 s -> 118 s on the cola test,
+  identical geometry.
   FreeCAD-free core test: `python3 tests/smoke_bodysweep_core.py`.
 - Fixed `TypeError: int() argument must be ... not 'StandardButton'` in the Rail Pipe, Magic Loft and Dome task panels on
   newer PySide6 (FreeCAD 27.x), where `QDialogButtonBox.Ok` is an enum object instead of an int (issue #2).

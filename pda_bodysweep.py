@@ -102,9 +102,10 @@ def _solid(x):
 # ---------------------------------------------------------------------- main
 def run(doc, tool, guide, target=None, support=None, commit=None, fit_tol=0.01, min_strip=1.0,
         min_track_len=10.0, twist_deg=0.0, result_name="BodySweepResult", show=True,
-        verify=True, adaptive=True, sec_tol=0.01, fuzzy=0.05):
+        verify=True, adaptive=True, sec_tol=0.01, fuzzy=0.05, workers=None):
     """tool / target: objects or shapes; guide: object, shape or list of edges;
     support: a face (or object whose first face is used) the tool stays normal to;
+    workers: threads for the exact sections (default cpu count - 2; 1 = serial);
     fuzzy: boolean fuzzy value (mm) gluing the tube end caps to the exact end pieces;
     twist_deg: total roll of the tool about the path tangent, spread evenly over the
     path length (a Draft polar array along its own axis is such a screw motion).
@@ -183,7 +184,7 @@ def run(doc, tool, guide, target=None, support=None, commit=None, fit_tol=0.01, 
             env = es.build_envelope_adaptive(sw, tol=sec_tol, tube_ext=ext, fixed=breaks,
                                              ds_min=max(0.1, min(0.25, path.L / 2000)),
                                              seg_step=1.0, min_strip=min_strip,
-                                             min_track_len=min_track_len, log=L_)
+                                             min_track_len=min_track_len, log=L_, workers=workers)
         else:
             ds = max(0.25, min(4.0, path.L / 80))     # station spacing scales with the path
             env = es.build_envelope(sw, ds_mid=ds, seg_step=1.0, min_strip=min_strip,

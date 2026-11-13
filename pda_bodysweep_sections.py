@@ -313,6 +313,26 @@ def project_arclen(c, cl, q):
 
 
 
+def prefetch_sections(sw, stations, cache, workers=None):
+    """Compute the exact sections at `stations` that are not in `cache` yet, in parallel threads.
+    Every section is independent; numpy / shapely release the GIL in their heavy calls, so threads scale with
+    the core count (and, unlike fork, are safe inside a multi-threaded host such as FreeCAD).
+    workers: thread count (default: cpu count - 2, at least 1; 1 = serial)."""
+    import os
+    todo = sorted({float(x) for x in stations if float(x) not in cache})
+    if not todo:
+        return 0
+    n = workers if workers else max(1, (os.cpu_count() or 2) - 2)
+    if n <= 1 or len(todo) < 2:
+        for x in todo:
+            cache[x] = sw.section(x)
+        return len(todo)
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=min(n, len(todo))) as ex:
+        for x, r in zip(todo, ex.map(sw.section, todo)):
+            cache[x] = r
+    return len(todo)
+
 def _snap_end(sw, s, U):
     """Tube end sections: where the envelope has settled onto the static end body's own cut (excess <= 1 %),
     use that exact cut, so the tube end ring IS the body's section and the two share one plane face."""
@@ -342,7 +362,7 @@ def _mid_stations(L, ds):
 
 def build_envelope(sw, ds_mid=5.0, n_end=8, corner_deg=12.0, corner_lo=4.0, match_mm=12.0, seg_step=2.0,
                    tip_eps=1e-3, tube_ext=None, ds_ext=2.0, min_strip=1.0,
-                   min_track_len=10.0, keep_deg=45.0, stations=None, cache=None, coarse_gap=np.inf, min_gap=0.5):
+                   min_track_len=10.0, keep_deg=45.0, stations=None, cache=None, coarse_gap=np.inf, min_gap=0.5, workers=None):
     """stations: explicit station list (adaptive refinement); cache: dict s -> section."""
     L = sw.path.L
     if stations is not None:
@@ -387,6 +407,8 @@ def build_envelope(sw, ds_mid=5.0, n_end=8, corner_deg=12.0, corner_lo=4.0, matc
         sw.tube_ends = (-e0, L + e1)
 
     # ---- 1. exact sections
+    if cache is not None:
+        prefetch_sections(sw, st, cache, workers)
     secs = []
     for s in st:
         if cache is not None and s in cache:
@@ -692,7 +714,7 @@ def _ring_gap(true_c, q):
     return float(shapely.distance(shapely.points(true_c), lr).max())
 
 
-def check_intervals(env, sw, cache):
+def check_intervals(env, sw, cache, workers=None):
     """For every pair of neighbouring stations: compute the TRUE section half way and
     compare it with what the column curves (interpolated along the path) give there.
       fwd : how far the curves' points leave the true section          (mm)
@@ -714,6 +736,7 @@ def check_intervals(env, sw, cache):
         U0 = cache.get(S["s"], (None, None, None))[2]
         if U0 is not None:
             basef[i] = float(shapely.distance(shapely.points((R[i] - S["P"]) @ S["M"][:, 1:3]), U0.exterior).max())
+    prefetch_sections(sw, [0.5 * (secs[i]["s"] + secs[i + 1]["s"]) for i in range(nS - 1)], cache, workers)
     fwd = np.zeros(nS - 1); rev = np.zeros(nS - 1); mids = np.zeros(nS - 1)
     J = np.arange(N)
     for i in range(nS - 1):
@@ -743,7 +766,7 @@ def check_intervals(env, sw, cache):
 
 
 def build_envelope_adaptive(sw, tol=0.01, rev_tol=None, ds0=None, ds_min=0.25, ds_birth=1.0,
-                            tube_ext=(0.0, 0.0), fixed=(), max_iter=16, max_st=1500, log=None, **kw):
+                            tube_ext=(0.0, 0.0), fixed=(), max_iter=16, max_st=1500, log=None, workers=None, **kw):
     """Few stations where the envelope is calm, many where it changes: start sparse
     (path ends, tube ends and guide breaks always included), check every interval
     against a true mid section, split the ones that miss the tolerance, repeat.
@@ -796,8 +819,8 @@ def build_envelope_adaptive(sw, tol=0.01, rev_tol=None, ds0=None, ds_min=0.25, d
     st = np.unique(np.r_[np.concatenate(st), [float(x) for x in fixed if 0 < x < L]])
     t0 = time.time()
     for it in range(max_iter):
-        env = build_envelope(sw, stations=st, cache=cache, tube_ext=(e0, e1), coarse_gap=2 * ds_birth, **kw)
-        fwd, rev, mids = check_intervals(env, sw, cache)
+        env = build_envelope(sw, stations=st, cache=cache, tube_ext=(e0, e1), coarse_gap=2 * ds_birth, workers=workers, **kw)
+        fwd, rev, mids = check_intervals(env, sw, cache, workers)
         sv = np.array([S["s"] for S in env["secs"]]); gap = np.diff(sv)
         bad = ((fwd > tol) | (rev > rev_tol)) & (gap > 2 * ds_min)
         nS = len(sv)
