@@ -102,9 +102,10 @@ def _solid(x):
 # ---------------------------------------------------------------------- main
 def run(doc, tool, guide, target=None, support=None, commit=None, fit_tol=0.01, min_strip=1.0,
         min_track_len=10.0, twist_deg=0.0, result_name="BodySweepResult", show=True,
-        verify=True, adaptive=True, sec_tol=0.01):
+        verify=True, adaptive=True, sec_tol=0.01, fuzzy=0.05):
     """tool / target: objects or shapes; guide: object, shape or list of edges;
     support: a face (or object whose first face is used) the tool stays normal to;
+    fuzzy: boolean fuzzy value (mm) gluing the tube end caps to the exact end pieces;
     twist_deg: total roll of the tool about the path tangent, spread evenly over the
     path length (a Draft polar array along its own axis is such a screw motion).
     Without a target the result is the swept solid itself."""
@@ -221,7 +222,7 @@ def run(doc, tool, guide, target=None, support=None, commit=None, fit_tol=0.01, 
         sol = bb.build_solid(env, st_step=1, sew_tol=0.01, fit_tol=fit_tol, log=L_)
         L_("zarf tupu: isValid %s, %d yuz" % (sol.isValid(), len(sol.Faces)))
         if tgt is not None:
-            t = time.time(); res = tgt.cut([sol] + pieces, 1e-3)
+            t = time.time(); res = tgt.cut([sol] + pieces, fuzzy)
             L_("KESME %.1fs: isValid %s, %d yuz, en buyuk kenar toleransi %.4f"
                % (time.time() - t, res.isValid(), len(res.Faces), max(e.Tolerance for e in res.Edges)))
             if verify:
@@ -229,7 +230,7 @@ def run(doc, tool, guide, target=None, support=None, commit=None, fit_tol=0.01, 
                 exp = mesh_volume(tgt, vt) - mesh_volume(tgt.common(sol.fuse(pieces) if pieces else sol), vt)
                 L_("hacim: OCC %.1f | ag %.1f | beklenen %.1f" % (res.Volume, mesh_volume(res, vt), exp))
         else:
-            t = time.time(); res = sol.fuse(pieces, 1e-3) if pieces else sol.copy()
+            t = time.time(); res = sol.fuse(pieces, fuzzy) if pieces else sol.copy()
             try:
                 res = res.removeSplitter()
             except Exception:

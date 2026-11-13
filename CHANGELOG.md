@@ -5,6 +5,8 @@
 - Body Sweep (work in progress, on branch `body-sweep`): `pda_bodysweep*.py` sweep a convex solid tool along a guide and
   cut a target without a boolean of many copies - the swept envelope is built directly from exact sections perpendicular
   to the path. No toolbar command yet; run `pda_bodysweep.run_selection()` from the Python console. Needs scipy and shapely.
+  The tube end sections are the static body's exact cut and the end caps are glued with a 0.05 mm fuzzy fuse (no sliver
+  faces at the start / end corners of a rotating tool).
   FreeCAD-free core test: `python3 tests/smoke_bodysweep_core.py`.
 - Fixed `TypeError: int() argument must be ... not 'StandardButton'` in the Rail Pipe, Magic Loft and Dome task panels on
   newer PySide6 (FreeCAD 27.x), where `QDialogButtonBox.Ok` is an enum object instead of an int (issue #2).

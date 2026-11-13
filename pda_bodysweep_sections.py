@@ -312,6 +312,24 @@ def project_arclen(c, cl, q):
     return cl[k] + f[k] * (cl[k + 1] - cl[k])
 
 
+
+def _snap_end(sw, s, U):
+    """Tube end sections: where the envelope has settled onto the static end body's own cut (excess <= 1 %),
+    use that exact cut, so the tube end ring IS the body's section and the two share one plane face."""
+    te = getattr(sw, "tube_ends", None)
+    if sw.ends != "tube" or te is None or U is None:
+        return U
+    L = sw.path.L
+    for k, se in ((0, te[0]), (-1, te[1])):
+        if (se < -1e-9 if k == 0 else se > L + 1e-9) and abs(s - se) < 1e-9:
+            S0 = sw.static_slice(k, s)
+            if S0 is not None and not S0.is_empty:
+                if S0.geom_type == "MultiPolygon":
+                    S0 = max(S0.geoms, key=lambda g: g.area)
+                if U.difference(S0.buffer(0.02)).area <= 0.01 * U.area:
+                    return S0
+    return U
+
 # ------------------------------------------------------------- pipeline
 def _mid_stations(L, ds):
     """0, ds, 2ds, ... , L without a near-duplicate station just before L (two
@@ -377,6 +395,7 @@ def build_envelope(sw, ds_mid=5.0, n_end=8, corner_deg=12.0, corner_lo=4.0, matc
             P, M, U = sw.section(s)
             if cache is not None:
                 cache[s] = (P, M, U)
+        U = _snap_end(sw, s, U)
         if U is None or U.area < 1e-6:
             continue
         c = ccw_ring(U)
