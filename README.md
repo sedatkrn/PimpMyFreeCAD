@@ -196,7 +196,7 @@ temporary STEP file is deleted. A strict-check warning can appear on a sound sol
 ## Installation
 
 **Addon Manager (custom repository)**
-1. *Tools → Addon manager → ⚙ (settings) → Custom repositories*, add
+1. *Edit → Preferences → Addon Manager Options → Custom repositories*, add
    `https://github.com/sedatkrn/PimpMyFreeCAD` with branch `main`.
 2. Find **Pimp My FreeCAD**, install, restart FreeCAD.
 
